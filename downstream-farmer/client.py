@@ -24,7 +24,10 @@ class DownstreamClient(object):
         raise NotImplementedError
 
     def answer(self, hash, hash_answer):
-        pass
+        raise NotImplementedError
+
+    def _enc_fname(self, filename):
+        return urlify(os.path.split(filename)[1])
 
     def get_challenges(self, filename):
         enc_fname = urlify(os.path.split(filename)[1])
