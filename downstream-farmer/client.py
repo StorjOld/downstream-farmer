@@ -4,7 +4,7 @@ import os
 
 import requests
 
-from utils import urlencode
+from utils import urlify
 
 
 class DownstreamClient(object):
@@ -12,6 +12,6 @@ class DownstreamClient(object):
         self.server = server_url.strip('/')
 
     def get_challenges(self, filename):
-        enc_fname = urlencode(os.path.split(filename)[1])
+        enc_fname = urlify(os.path.split(filename)[1])
         url = '%s/api/downstream/challenge/%s' % (self.server, enc_fname)
         resp = requests.get(url)
