@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+from heartbeat import Challenge
 
 import requests
 
-from utils import urlify
+from .utils import urlify
+from .exc import DownstreamError
 
 
 class DownstreamClient(object):
     def __init__(self, server_url):
         self.server = server_url.strip('/')
+        self.challenges = []
 
     def connect(self, url):
         raise NotImplementedError
