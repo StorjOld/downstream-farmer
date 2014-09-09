@@ -40,8 +40,8 @@ def eval_args(args):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('node')
-    parser.add_argument('--answer-challenge', action='store_true')
+    parser.add_argument('node-url')
+    parser.add_argument('--answer-challenge', nargs='?')
 
 
 def main():
