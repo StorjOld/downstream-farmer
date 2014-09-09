@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+import random
 from heartbeat import Challenge
 
 import requests
@@ -51,3 +52,6 @@ class DownstreamClient(object):
     def answer_challenge(self, filename):
         enc_fname = self._enc_fname(filename)
         raise NotImplementedError
+
+    def random_challenge(self):
+        random.choice(self.challenges)
