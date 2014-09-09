@@ -36,6 +36,17 @@ class DownstreamClient(object):
         enc_fname = urlify(os.path.split(filename)[1])
         url = '%s/api/downstream/challenge/%s' % (self.server, enc_fname)
         resp = requests.get(url)
+        try:
+            resp.raise_for_status()
+        except Exception as e:
+            raise DownstreamError("Error connecting to downstream-node:",
+                                        e.message)
+
+        _json = resp.json()
+
+        for challenge in _json['challenges']:
+            chal = Challenge(challenge.get('block'), challenge.get('seed'))
+            self.challenges.append(chal)
 
     def answer_challenge(self, filename):
         enc_fname = self._enc_fname(filename)
