@@ -40,9 +40,8 @@ class DownstreamClient(object):
         try:
             resp.raise_for_status()
         except Exception as e:
-            raise DownstreamError("Error connecting to downstream-node:",
-                                        e.message)
-
+            raise DownstreamError("Error connecting to downstream"
+                                  "-node:", e.message)
         _json = resp.json()
 
         for challenge in _json['challenges']:
