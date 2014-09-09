@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import sys
 
 from .client import DownstreamClient
 from .exc import ConnectError
@@ -25,9 +26,14 @@ def check_connectivity(url):
 
 def eval_args(args):
     try:
-        check_connectivity()
-    dsc = DownstreamClient()
-    if args.:
+        check_connectivity(args.node_url)
+    except ConnectError as e:
+        sys.stderr.println('%s\n' % e.message)
+        sys.exit(1)
+
+    dsc = DownstreamClient(args.node_url)
+
+    if args.answer_challenge:
          dsc.get_challenges()
          dsc.answer_challenge()
 
