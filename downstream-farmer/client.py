@@ -16,6 +16,7 @@ class DownstreamClient(object):
     def __init__(self, server_url):
         self.server = server_url.strip('/')
         self.challenges = []
+        self.heartbeat = None
 
     def connect(self, url):
         raise NotImplementedError
