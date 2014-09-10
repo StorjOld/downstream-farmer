@@ -52,6 +52,11 @@ class DownstreamClient(object):
             self.challenges.append(chal)
 
     def answer_challenge(self, filename):
+        try:
+            assert os.path.isfile(filename)
+        except AssertionError:
+            raise DownstreamError('%s is not a valid file' % filename)
+
         enc_fname = self._enc_fname(filename)
         raise NotImplementedError
 
