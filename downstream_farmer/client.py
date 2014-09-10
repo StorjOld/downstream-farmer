@@ -44,11 +44,17 @@ class DownstreamClient(object):
             resp.raise_for_status()
         except Exception as e:
             raise DownstreamError("Error connecting to downstream"
-                                  "-node:", e.message)
-        _json = resp.json()
+                                  "-node: %s" % e.message)
 
-        for challenge in _json['challenges']:
-            chal = Challenge(challenge.get('block'), challenge.get('seed'))
+        try:
+            response_json = resp.json()
+        except ValueError:
+            raise DownstreamError('Invalid response from Downstream node.')
+
+        for challenge in response_json['challenges']:
+            chal = Challenge(
+                int(challenge.get('block')), challenge.get('seed')
+            )
             self.challenges.append(chal)
 
     def answer_challenge(self, filename):
