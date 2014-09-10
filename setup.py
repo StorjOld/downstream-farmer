@@ -1,9 +1,11 @@
 from setuptools import setup
 
+from downstream_farmer import __version__
+
 setup(
     name='downstream-farmer',
-    version='',
-    packages=['downstream-farmer'],
+    version=__version__,
+    packages=['downstream_farmer'],
     url='',
     license='',
     author='Storj Labs',
