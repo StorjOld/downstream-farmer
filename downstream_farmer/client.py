@@ -73,7 +73,7 @@ class DownstreamClient(object):
         data = {
             'block': select_chal.block,
             'seed': select_chal.seed,
-            'r': answer
+            'response': answer
         }
         headers = {
             'Content-Type': 'application/json'
