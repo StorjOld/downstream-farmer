@@ -15,6 +15,27 @@ except ImportError:
     from urllib.error import URLError
 
 
+def fail_exit(msg, exit_code=1):
+    sys.stderr.write('Error: %s\n' % msg)
+    sys.exit(exit_code)
+
+
+def verify_ownership(client, filename):
+    print('Fetching challenges...')
+    try:
+        client.get_challenges(filename)
+    except DownstreamError as e:
+        fail_exit(e.message)
+
+    print('Verifying ownership...')
+    try:
+        client.answer_challenge(filename)
+    except DownstreamError as e:
+        fail_exit(e.message)
+    else:
+        print('Validated.')
+
+
 def check_connectivity(url):
         """ Check to see if we even get a connection to the server.
         https://stackoverflow.com/questions/3764291/checking-network-connection
