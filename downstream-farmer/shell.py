@@ -55,15 +55,16 @@ def eval_args(args):
 
     dsc = DownstreamClient(args.node_url)
 
-    if args.answer_challenge:
-         dsc.get_challenges()
-         dsc.answer_challenge()
+    if args.verify_ownership:
+        verify_ownership(dsc, args.verify_ownership)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('node-url')
-    parser.add_argument('--answer-challenge', nargs='?')
+    parser = argparse.ArgumentParser('downstream-farmer')
+    parser.add_argument('node-url', help='URL of the Downstream node')
+    parser.add_argument('--verify-ownership', nargs='?',
+                        help='Verify ownership of a file to a Downstream node')
+    return parser.parse_args()
 
 
 def main():
