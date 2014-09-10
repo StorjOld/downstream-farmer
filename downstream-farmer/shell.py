@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
-import argparse
 import sys
+import argparse
 
 from .client import DownstreamClient
-from .exc import ConnectError
+from .exc import ConnectError, DownstreamError
 
 try:
     from urllib2 import urlopen, URLError
