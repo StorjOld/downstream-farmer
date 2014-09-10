@@ -82,7 +82,10 @@ class DownstreamClient(object):
                % (self.server, enc_fname))
         r = requests.post(url, data=json.dumps(data), headers=headers)
 
-        response_json = r.json()
+        try:
+            response_json = r.json()
+        except ValueError:
+            response_json = {}
 
         try:
             r.raise_for_response()
