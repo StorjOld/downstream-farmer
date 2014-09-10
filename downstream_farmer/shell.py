@@ -51,8 +51,7 @@ def eval_args(args):
     try:
         check_connectivity(args.node_url)
     except ConnectError as e:
-        sys.stderr.println('%s\n' % e.message)
-        sys.exit(1)
+        fail_exit(e.message)
 
     dsc = DownstreamClient(args.node_url)
 
