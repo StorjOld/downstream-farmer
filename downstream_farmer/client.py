@@ -88,7 +88,7 @@ class DownstreamClient(object):
             response_json = {}
 
         try:
-            r.raise_for_response()
+            r.raise_for_status()
         except requests.exceptions.HTTPError:
             raise DownstreamError('Error reponse from Downstream node: %s %s'
                                   % (r.status_code, response_json.get('msg')))
