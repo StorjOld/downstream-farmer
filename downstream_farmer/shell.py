@@ -65,8 +65,12 @@ def parse_args():
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node-url', help='URL of the Downstream node')
-    parser.add_argument('--verify-ownership', nargs='?',
-                        help='Verify ownership of a file to a Downstream node')
+    parser.add_argument(
+        '--verify-ownership',
+        nargs='?',
+        metavar='/path/to/file',
+        help='Verify ownership of a file to a Downstream node'
+    )
     return parser.parse_args()
 
 
