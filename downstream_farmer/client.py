@@ -38,7 +38,7 @@ class DownstreamClient(object):
 
     def get_challenges(self, filename):
         enc_fname = urlify(os.path.split(filename)[1])
-        url = '%s/api/downstream/challenge/%s' % (self.server, enc_fname)
+        url = '%s/api/downstream/challenges/%s' % (self.server, enc_fname)
         resp = requests.get(url)
         try:
             resp.raise_for_status()
