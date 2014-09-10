@@ -65,7 +65,7 @@ class DownstreamClient(object):
 
         enc_fname = self._enc_fname(filename)
         self.heartbeat = Heartbeat(
-            filename, hashlib.sha256(os.urandom(32).hexdigest())
+            filename, hashlib.sha256(os.urandom(32)).hexdigest()
         )
         self.heartbeat.challenges = self.challenges
         select_chal = self.heartbeat.random_challenge()
