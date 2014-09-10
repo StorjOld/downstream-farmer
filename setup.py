@@ -18,7 +18,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'downstream = downstream-farmer.shell:main'
+            'downstream = downstream_farmer.shell:main'
         ]
     }
 )
