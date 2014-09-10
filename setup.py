@@ -13,7 +13,12 @@ setup(
         'requests',
         'heartbeat==0.1.2'
     ],
-    dependency_links = [
+    dependency_links=[
         'https://github.com/Storj/heartbeat/archive/v0.1.2.tar.gz#egg=heartbeat-0.1.2'
     ],
+    entry_points={
+        'console_scripts': [
+            'downstream = downstream-farmer.shell:main'
+        ]
+    }
 )
