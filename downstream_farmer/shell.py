@@ -63,7 +63,7 @@ def parse_args():
     parser = argparse.ArgumentParser('downstream-farmer')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
-    parser.add_argument('node-url', help='URL of the Downstream node')
+    parser.add_argument('node_url', help='URL of the Downstream node')
     parser.add_argument(
         '--verify-ownership',
         nargs='?',
