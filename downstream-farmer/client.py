@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+import json
 import random
-from heartbeat import Challenge
+import hashlib
 
 import requests
+from heartbeat import Challenge, Heartbeat
 
 from .utils import urlify
 from .exc import DownstreamError
