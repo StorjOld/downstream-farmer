@@ -58,7 +58,32 @@ class DownstreamClient(object):
             raise DownstreamError('%s is not a valid file' % filename)
 
         enc_fname = self._enc_fname(filename)
-        raise NotImplementedError
+        self.heartbeat = Heartbeat(
+            filename, hashlib.sha256(os.urandom(32).hexdigest())
+        )
+        self.heartbeat.challenges = self.challenges
+        select_chal = self.heartbeat.random_challenge()
+        answer = self.heartbeat.meet_challenge(select_chal)
+        data = {
+            'block': select_chal.block,
+            'seed': select_chal.seed,
+            'r': answer
+        }
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        url = ('%s/api/downstream/challenges/answer/%s'
+               % (self.server, enc_fname))
+        r = requests.post(url, data=json.dumps(data), headers=headers)
+
+        response_json = r.json()
+
+        try:
+            r.raise_for_response()
+        except requests.exceptions.HTTPError:
+            raise DownstreamError('Error reponse from Downstream node: %s %s'
+                                  % (r.status_code, response_json.get('msg')))
+        return response_json
 
     def random_challenge(self):
         random.choice(self.challenges)
