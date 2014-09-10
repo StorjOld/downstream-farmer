@@ -6,7 +6,8 @@ import sys
 import argparse
 
 from .client import DownstreamClient
-from .exc import ConnectError, DownstreamError
+from downstream_farmer import __version__
+from downstream_farmer.exc import ConnectError, DownstreamError
 
 try:
     from urllib2 import urlopen, URLError
@@ -61,6 +62,8 @@ def eval_args(args):
 
 def parse_args():
     parser = argparse.ArgumentParser('downstream-farmer')
+    parser.add_argument('-V', '--version', action='version',
+                        version=__version__)
     parser.add_argument('node-url', help='URL of the Downstream node')
     parser.add_argument('--verify-ownership', nargs='?',
                         help='Verify ownership of a file to a Downstream node')
