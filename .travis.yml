@@ -2,14 +2,28 @@
   language: python
   python:
     - "2.7"
-#    - "3.3"
-#    - "3.4"
+    - "3.3"
+    - "3.4"
   # command to install dependencies
+
+  env: PYTHONPATH="$PWD/node:$PYTHONPATH"
+
+  services:
+    - mysql
+
   install:
     - "pip install flake8 coverage"
     - "pip install --process-dependency-links ."
+    - "git clone https://github.com/Storj/downstream-node.git node"
+    - "cd node; pip install .; cd .."
+
+  before_script:
+    - 'mysql -e "create database if not exists downstream;" -u root'
+    - "python node/runapp.py --initdb"
+    - "nohup python node/runapp.py & > /dev/null"
 
   # command to run tests
   script:
-    - flake8 downstream_farmer/
-    - nosetests -v tests/
+    - "flake8 downstream_farmer/"
+    - "nosetests -v --with-coverage --cover-package=downstream_farmer -cover-branches --cover-min-percentage=90 tests/"
+    - "downstream --verify-ownership tests/thirty-two_meg.testfile 'http://localhost:5000'"
