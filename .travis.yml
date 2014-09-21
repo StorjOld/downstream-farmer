@@ -1,0 +1,14 @@
+---
+  language: python
+  python:
+    - "2.7"
+#    - "3.3"
+#    - "3.4"
+  # command to install dependencies
+  install:
+    - "pip install --process-dependency-links ."
+
+  # command to run tests
+  script:
+    - flake8 downstream_farmer/
+    - nosetests -v tests/
