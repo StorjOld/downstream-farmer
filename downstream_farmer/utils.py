@@ -3,9 +3,9 @@
 
 
 try:
-    from urllib import quote_plus
+    from urllib import quote
 except ImportError:
-    from urllib.parse import quote_plus
+    from urllib.parse import quote
 
 
 def urlify(string):
@@ -20,4 +20,4 @@ def urlify(string):
     :param string: String to URLify
     :return: URLified string
     """
-    return quote_plus(string)
+    return quote(string)
