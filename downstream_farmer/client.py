@@ -50,7 +50,6 @@ class DownstreamClient(object):
             response_json = resp.json()
         except ValueError:
             raise DownstreamError('Invalid response from Downstream node.')
-
         for challenge in response_json['challenges']:
             chal = Challenge(
                 int(challenge.get('block')), challenge.get('seed')
@@ -95,4 +94,4 @@ class DownstreamClient(object):
         return response_json
 
     def random_challenge(self):
-        random.choice(self.challenges)
+        return random.choice(self.challenges)
