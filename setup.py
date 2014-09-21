@@ -6,17 +6,17 @@ setup(
     name='downstream-farmer',
     version=__version__,
     packages=['downstream_farmer'],
-    url='',
-    license='',
+    url='https://github.com/Storj/downstream-farmer',
+    license='MIT',
     author='Storj Labs',
     author_email='info@storj.io',
-    description='',
+    description='Client software for a Storj farmer',
     install_requires=[
         'requests',
         'heartbeat==0.1.2'
     ],
     dependency_links=[
-        'https://github.com/Storj/heartbeat/archive/v0.1.2.tar.gz#egg=heartbeat-0.1.2'
+        'git+https://github.com/Storj/heartbeat.git@v0.1.2#egg=heartbeat-0.1.2'
     ],
     entry_points={
         'console_scripts': [
