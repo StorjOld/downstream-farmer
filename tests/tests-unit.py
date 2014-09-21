@@ -21,7 +21,7 @@ class TestClient(unittest.TestCase):
     def setUp(self):
         self.server_url = 'https://test.url/'
         self.client = DownstreamClient(self.server_url)
-        self.testfile = 'thirty-two_meg.testfile'
+        self.testfile = 'tests/thirty-two_meg.testfile'
 
     def tearDown(self):
         pass
@@ -86,7 +86,7 @@ class TestClient(unittest.TestCase):
             with self.assertRaises(DownstreamError) as ex:
                 self.client.answer_challenge(self.testfile)
         msg = ex.exception.message
-        self.assertEqual(msg, 'thirty-two_meg.testfile is not a valid file')
+        self.assertEqual(msg, 'tests/thirty-two_meg.testfile is not a valid file')
 
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
@@ -125,7 +125,7 @@ class TestClient(unittest.TestCase):
             self.client.get_challenges(self.testfile)
         result = self.client.random_challenge()
         self.assertIn(result, self.client.challenges)
-        
+
 
 class MockValues:
     response = {

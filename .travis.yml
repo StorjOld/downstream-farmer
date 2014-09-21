@@ -6,6 +6,7 @@
 #    - "3.4"
   # command to install dependencies
   install:
+    - "pip install flake8 coverage"
     - "pip install --process-dependency-links ."
 
   # command to run tests
