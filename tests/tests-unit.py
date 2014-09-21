@@ -133,6 +133,92 @@ class TestClient(unittest.TestCase):
         self.assertIn(result, self.client.challenges)
 
 
+class TestExceptions(unittest.TestCase):
+    def test_py3kexception(self):
+        e = Py3kException('Test Exception')
+        self.assertEqual(e.message, 'Test Exception')
+        result = str(e)
+        self.assertEqual(result, 'Test Exception')
+
+    def test_downstream_error(self):
+        e = DownstreamError('Test Exception')
+        self.assertEqual(e.message, 'Test Exception')
+        result = str(e)
+        self.assertEqual(result, 'Test Exception')
+
+    def test_connecterror(self):
+        e = ConnectError('Test Exception')
+        self.assertEqual(e.message, 'Test Exception')
+        result = str(e)
+        self.assertEqual(result, 'Test Exception')
+
+
+class TestShell(unittest.TestCase):
+    def setUp(self):
+        self._old_argv = sys.argv
+
+    def tearDown(self):
+        sys.argv = self._old_argv
+
+    def test_parse_args(self):
+        sys.argv = [
+            'downstream', 'http://localhost:5000'
+        ]
+        args = shell.parse_args()
+        self.assertIsInstance(args, Namespace)
+
+        with self.assertRaises(SystemExit):
+            sys.argv[1] = '--version'
+            shell.parse_args()
+
+    def test_eval_args(self):
+        with mock.patch('downstream_farmer.shell.check_connectivity') as check:
+            check.side_effect = ConnectError('Oops')
+            m = mock.Mock()
+            with self.assertRaises(SystemExit):
+                shell.eval_args(m)
+            self.assertTrue(check.called)
+
+        with mock.patch('downstream_farmer.shell.check_connectivity'):
+            with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
+                shell.eval_args(m)
+                self.assertTrue(dc.called)
+
+                m.verify_ownership = True
+                with mock.patch('downstream_farmer.shell.verify_ownership') as vo:
+                    shell.eval_args(m)
+                    self.assertTrue(vo.called)
+
+    def test_check_connectivity(self):
+        with mock.patch('downstream_farmer.shell.urlopen') as patch:
+            patch.side_effect = URLError('Problem')
+            with self.assertRaises(ConnectError) as ex:
+                shell.check_connectivity(None)
+
+        with mock.patch('downstream_farmer.shell.urlopen'):
+            result = shell.check_connectivity(None)
+            self.assertIsNone(result)
+
+    def test_verify_ownership(self):
+        m = mock.MagicMock()
+        m.get_challenges.side_effect = DownstreamError('Oh snap')
+        with self.assertRaises(SystemExit):
+            shell.verify_ownership(m, None)
+
+        m = mock.MagicMock()
+        m.answer_challenge.side_effect = DownstreamError('Oh fudge')
+        with self.assertRaises(SystemExit):
+            shell.verify_ownership(m, None)
+
+        m = mock.MagicMock()
+        result = shell.verify_ownership(m, None)
+        self.assertIsNone(result)
+
+    def test_fail_exit(self):
+        with self.assertRaises(SystemExit):
+            shell.fail_exit('Test')
+
+
 class MockValues:
     response = {
         "challenges": [
