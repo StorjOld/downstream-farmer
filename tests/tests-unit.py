@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import random
-
+import sys
 import unittest
+from argparse import Namespace
+try:
+    from urllib2 import URLError
+except ImportError:
+    from urllib.error import URLError
+
 import mock
 import requests
-from downstream_farmer import utils
+
+from downstream_farmer import utils, shell
 from downstream_farmer.client import DownstreamClient
-from downstream_farmer.exc import DownstreamError
+from downstream_farmer.exc import DownstreamError, Py3kException, ConnectError
 
 
 class TestUtils(unittest.TestCase):
