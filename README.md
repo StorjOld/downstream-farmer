@@ -1,6 +1,12 @@
 downstream-farmer
 =================
 
+## Test Builds
+
+Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer)
+
+Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer)
+
 ## Client Functions
 Connects to a downstream compatible node. Should also generate a new account token.
     
