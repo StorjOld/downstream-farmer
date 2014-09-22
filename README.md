@@ -1,11 +1,44 @@
 downstream-farmer
 =================
 
-## Test Builds
+## Build Status
 
 Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer)
 
 Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer)
+
+## What is this I don't even?
+
+Downstream-farmer talks to[downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  Downstream requires MySQL and a working config.
+
+Get the node:
+
+```
+$ pip install git+https://github.com/Storj/downstream-node.git
+```
+
+Edit the config with the appropriate details:
+
+```
+$ vim downstream-node/config/config.py
+```
+
+Create the database and schema, and start the server:
+
+```
+$ mysql -e "create database if not exists downstream;"
+$ python downstream-node/runapp.py --initdb
+$ python downstream-node/runapp.py
+```
+
+Run a file verification:
+
+```
+downstream --verify-ownership tests/thirty-two_meg.testfile 'http://localhost:5000'
+```
+
+**If this is at all confusing, we're doing it as a functional test in the travis.yml file, so watch it in action on Travis-CI.**
+
 
 ## Client Functions
 Connects to a downstream compatible node. Should also generate a new account token.
