@@ -3,13 +3,12 @@ downstream-farmer
 
 ## Build Status
 
-Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer)
-
+Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer) 
 Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer)
 
 ## What is this I don't even?
 
-Downstream-farmer talks to[downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  Downstream requires MySQL and a working config.
+Downstream-farmer talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running. Downstream requires MySQL and a working config.
 
 Get the node:
 
