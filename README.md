@@ -8,19 +8,7 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 
 ## What is this I don't even?
 
-<<<<<<< Updated upstream
-Downstream-farmer talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running. Downstream requires MySQL and a working config.
-
-Get the node:
-
-```
-$ pip install git+https://github.com/Storj/downstream-node.git
-```
-
-Edit the config with the appropriate details:
-=======
 `downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, installs its own dependencies.
->>>>>>> Stashed changes
 
 ```
 $ pip install --process-dependency-links git+https://github.com/Storj/downstream-farmer.git
