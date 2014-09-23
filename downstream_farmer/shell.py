@@ -34,7 +34,6 @@ def verify_ownership(client, filename):
     except DownstreamError as e:
         fail_exit(e.message)
 
-    msg = response['msg']
     match = response['match']
     if match:
         print('\nFILE MATCHED!')

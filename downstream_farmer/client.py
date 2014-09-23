@@ -56,7 +56,6 @@ class DownstreamClient(object):
             chal = Challenge(
                 int(challenge.get('block')), challenge.get('seed')
             )
-            # print('Got challenge block %s, seed: %s' % (chal.block, chal.seed))
             self.challenges.append(chal)
         print('Received %d challenge(s).' % len(self.challenges))
 
