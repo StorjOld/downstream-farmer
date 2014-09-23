@@ -1,0 +1,2 @@
+requests
+git+https://github.com/Storj/heartbeat.git@v0.1.2
