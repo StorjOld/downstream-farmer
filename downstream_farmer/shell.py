@@ -30,11 +30,16 @@ def verify_ownership(client, filename):
 
     print('Verifying ownership...')
     try:
-        client.answer_challenge(filename)
+        response = client.answer_challenge(filename)
     except DownstreamError as e:
         fail_exit(e.message)
+
+    msg = response['msg']
+    match = response['match']
+    if match:
+        print('\nFILE MATCHED!')
     else:
-        print('Validated.')
+        print('\nFailed to match.')
 
 
 def check_connectivity(url):

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from __future__ import print_function
+
 import os
 import json
 import random
@@ -48,15 +50,18 @@ class DownstreamClient(object):
 
         try:
             response_json = resp.json()
-        except ValueError:
+        except:
             raise DownstreamError('Invalid response from Downstream node.')
         for challenge in response_json['challenges']:
             chal = Challenge(
                 int(challenge.get('block')), challenge.get('seed')
             )
+            # print('Got challenge block %s, seed: %s' % (chal.block, chal.seed))
             self.challenges.append(chal)
+        print('Received %d challenge(s).' % len(self.challenges))
 
     def answer_challenge(self, filename):
+        print('Verifying local file %s.' % filename)
         try:
             assert os.path.isfile(filename)
         except AssertionError:
@@ -68,6 +73,8 @@ class DownstreamClient(object):
         )
         self.heartbeat.challenges = self.challenges
         select_chal = self.heartbeat.random_challenge()
+        print('Picked random challenge block %s, seed %s' % (select_chal.block,
+                                                             select_chal.seed))
         answer = self.heartbeat.meet_challenge(select_chal)
         data = {
             'block': select_chal.block,
@@ -79,6 +86,7 @@ class DownstreamClient(object):
         }
         url = ('%s/api/downstream/challenges/answer/%s'
                % (self.server, enc_fname))
+        print('Contacting %s with answer to challenge...' % url)
         r = requests.post(url, data=json.dumps(data), headers=headers)
 
         try:
