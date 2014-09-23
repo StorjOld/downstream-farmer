@@ -8,6 +8,7 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 
 ## What is this I don't even?
 
+<<<<<<< Updated upstream
 Downstream-farmer talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running. Downstream requires MySQL and a working config.
 
 Get the node:
@@ -17,23 +18,16 @@ $ pip install git+https://github.com/Storj/downstream-node.git
 ```
 
 Edit the config with the appropriate details:
+=======
+`downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, installs its own dependencies.
+>>>>>>> Stashed changes
 
 ```
-$ vim downstream-node/config/config.py
+$ pip install --process-dependency-links git+https://github.com/Storj/downstream-farmer.git
 ```
 
-Create the database and schema, and start the server:
-
 ```
-$ mysql -e "create database if not exists downstream;"
-$ python downstream-node/runapp.py --initdb
-$ python downstream-node/runapp.py
-```
-
-Run a file verification:
-
-```
-downstream --verify-ownership tests/thirty-two_meg.testfile 'http://localhost:5000'
+$ downstream --verify-ownership tests/thirty-two_meg.testfile 'http://address.to.farmer.node:5000'
 ```
 
 **If this is at all confusing, we're doing it as a functional test in the travis.yml file, so watch it in action on Travis-CI.**
