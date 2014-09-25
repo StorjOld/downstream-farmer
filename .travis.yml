@@ -12,7 +12,7 @@
     - mysql
 
   install:
-    - "pip install flake8 coverage"
+    - "pip install flake8 coverage coveralls"
     - "pip install --process-dependency-links ."
     - "git clone https://github.com/Storj/downstream-node.git node"
     - "cd node; pip install .; cd .."
@@ -21,6 +21,9 @@
     - 'mysql -e "create database if not exists downstream;" -u root'
     - "python node/runapp.py --initdb"
     - "nohup python node/runapp.py & > /dev/null"
+  
+  after_success:
+    - coveralls
 
   # command to run tests
   script:
