@@ -15,7 +15,7 @@
     - "pip install flake8 coverage coveralls"
     - "pip install -r requirements.txt"
     - "git clone https://github.com/Storj/downstream-node.git node"
-    - "cd node; pip install .; cd .."
+    - "cd node; pip install -r requirements.txt .; cd .."
 
   before_script:
     - 'mysql -e "create database if not exists downstream;" -u root'
