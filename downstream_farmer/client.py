@@ -2,103 +2,92 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import io
 import os
 import json
 import random
 import hashlib
 
 import requests
-from heartbeat import Challenge, Heartbeat
+from heartbeat import Heartbeat
+from RandomIO import RandomIO
 
-from .utils import urlify
+from .utils import urlify, handle_json_response
 from .exc import DownstreamError
 
+class Contract(object):
+    def __init__(self, hash, seed, size, challenge, tag):
+        self.hash = hash
+        self.seed = seed
+        self.size = size
+        self.challenge = challenge
+        self.tag = tag
 
 class DownstreamClient(object):
-    def __init__(self, server_url):
-        self.server = server_url.strip('/')
-        self.challenges = []
+    def __init__(self, address):
+        self.address = address
+        self.token = ''
+        self.server = ''
         self.heartbeat = None
+        self.contract = None
 
     def connect(self, url):
-        raise NotImplementedError
-
-    def store_path(self, path):
-        raise NotImplementedError
-
-    def get_chunk(self, hash):
-        raise NotImplementedError
-
-    def challenge(self, hash, challenge):
-        raise NotImplementedError
-
-    def answer(self, hash, hash_answer):
-        raise NotImplementedError
-
-    def _enc_fname(self, filename):
-        return urlify(os.path.split(filename)[1])
-
-    def get_challenges(self, filename):
-        enc_fname = urlify(os.path.split(filename)[1])
-        url = '%s/api/downstream/challenges/%s' % (self.server, enc_fname)
+        self.server = url.strip('/')
+        url = '{0}/api/downstream/new/{1}'.format(self.server, self.address)
+        
         resp = requests.get(url)
-        try:
-            resp.raise_for_status()
-        except Exception as e:
-            raise DownstreamError("Error connecting to downstream"
-                                  "-node: %s" % str(e))
+        r_json = handle_json_response(resp)
+        
+        for k in ['token','heartbeat']:
+            if (k not in r_json):
+                raise DownstreamError('Malformed response from server.')
+        
+        self.token = r_json['token']
+        self.heartbeat = Heartbeat.fromdict(r_json['heartbeat'])
 
-        try:
-            response_json = resp.json()
-        except:
-            raise DownstreamError('Invalid response from Downstream node.')
-        for challenge in response_json['challenges']:
-            chal = Challenge(
-                int(challenge.get('block')), challenge.get('seed')
-            )
-            self.challenges.append(chal)
-        print('Received %d challenge(s).' % len(self.challenges))
+    def get_chunk(self):
+        url = '{0}/api/downstream/chunk/{1}'.format(self.server, self.token)
 
-    def answer_challenge(self, filename):
-        print('Verifying local file %s.' % filename)
-        try:
-            assert os.path.isfile(filename)
-        except AssertionError:
-            raise DownstreamError('%s is not a valid file' % filename)
+        resp = requests.get(url)
+        r_json = handle_json_response(resp)
 
-        enc_fname = self._enc_fname(filename)
-        self.heartbeat = Heartbeat(
-            filename, hashlib.sha256(os.urandom(32)).hexdigest()
-        )
-        self.heartbeat.challenges = self.challenges
-        select_chal = self.heartbeat.random_challenge()
-        print('Picked random challenge block %s, seed %s' % (select_chal.block,
-                                                             select_chal.seed))
-        answer = self.heartbeat.meet_challenge(select_chal)
-        data = {
-            'block': select_chal.block,
-            'seed': select_chal.seed,
-            'response': answer
+        for k in ['file_hash', 'seed', 'size', 'challenge', 'tag']:
+            if (k not in r_json):
+                raise DownstreamError('Malformed response from server.')
+        
+        self.contract = Contract(
+            r_json['file_hash'],
+            r_json['seed'],
+            r_json['size'],
+            Heartbeat.challenge_type().fromdict(r_json['challenge']),
+            Heartbeat.tag_type().fromdict(r_json['tag']))
+
+    def answer_challenge(self):
+        if (self.contract is None):
+            raise DownstreamError('No contract to answer.')
+    
+        contract = self.contract
+    
+        url = '{0}/api/downstream/answer/{1}/{2}'.format(self.server,
+                                                         self.token,
+                                                         contract.hash)
+
+        with io.BytesIO(RandomIO(contract.seed).read(contract.size)) as f:
+            proof = self.heartbeat.prove(f, contract.challenge, contract.tag)
+
+        data = { 
+            'proof': proof.todict() 
         }
         headers = {
             'Content-Type': 'application/json'
         }
-        url = ('%s/api/downstream/challenges/answer/%s'
-               % (self.server, enc_fname))
-        print('Contacting %s with answer to challenge...' % url)
-        r = requests.post(url, data=json.dumps(data), headers=headers)
+        
+        resp = requests.post(url, data=json.dumps(data), headers=headers)
+        r_json = handle_json_response(resp)
+        
+        if ('status' not in r_json):
+            raise DownstreamError('Malformed response from server.')
+        
+        if (r_json['status'] != 'ok'):
+            raise DownstreamError('Challenge response rejected.')
 
-        try:
-            response_json = r.json()
-        except ValueError:
-            response_json = {}
-
-        try:
-            r.raise_for_status()
-        except requests.exceptions.HTTPError:
-            raise DownstreamError('Error reponse from Downstream node: %s %s'
-                                  % (r.status_code, response_json.get('msg')))
-        return response_json
-
-    def random_challenge(self):
-        return random.choice(self.challenges)

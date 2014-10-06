@@ -28,8 +28,8 @@
   # command to run tests
   script:
     - "flake8 downstream_farmer/"
-    - "nosetests -v --with-coverage --cover-package=downstream_farmer -cover-branches --cover-min-percentage=90 tests/"
-    - "downstream --verify-ownership tests/thirty-two_meg.testfile 'http://localhost:5000'"
+    - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
+    - "downstream 'http://localhost:5000'"
 
 #  notifications:
 #    slack: storj:IwoHonDxA5lauvwcKZRMkfps

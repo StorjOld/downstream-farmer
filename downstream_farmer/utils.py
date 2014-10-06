@@ -7,6 +7,8 @@ try:
 except ImportError:
     from urllib.parse import quote
 
+from .exc import DownstreamError
+
 
 def urlify(string):
     """ You might be wondering: why is this here at all, since it's basically
@@ -21,3 +23,18 @@ def urlify(string):
     :return: URLified string
     """
     return quote(string)
+
+    
+def handle_json_response(resp):
+    try:
+        resp.raise_for_status()
+    except Exception as ex:
+        raise DownstreamError("Error fetching downstream"
+                              "-node response: %s" % str(ex))
+
+    try:
+        r_json = resp.json()
+    except:
+        raise DownstreamError('Invalid response from Downstream node.')
+
+    return r_json
