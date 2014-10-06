@@ -29,6 +29,8 @@ def handle_json_response(resp):
     try:
         resp.raise_for_status()
     except Exception as ex:
+        r_json = resp.json()
+        print(r_json['message'])
         raise DownstreamError("Error fetching downstream"
                               "-node response: %s" % str(ex))
 
