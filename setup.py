@@ -13,10 +13,7 @@ setup(
     description='Client software for a Storj farmer',
     install_requires=[
         'requests',
-        'heartbeat==0.1.2'
-    ],
-    dependency_links=[
-        'git+https://github.com/Storj/heartbeat.git@v0.1.2#egg=heartbeat-0.1.2'
+        'storj-heartbeat'
     ],
     entry_points={
         'console_scripts': [
