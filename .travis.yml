@@ -17,7 +17,7 @@
   install:
     - "pip install flake8 coverage coveralls"
     - "pip install -r requirements.txt ."
-    - "git clone https://github.com/wiggzz/downstream-node/tree/devel node"
+    - "git clone -b devel https://github.com/wiggzz/downstream-node.git"
     - "cd node; pip install -r requirements.txt .; cd .."
 
   before_script:
