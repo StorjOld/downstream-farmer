@@ -14,7 +14,7 @@ setup(
     description='Client software for a Storj farmer',
     install_requires=[
         'requests',
-        'storj_heartbeat'
+        'storj-heartbeat'
     ],
     entry_points={
         'console_scripts': [
