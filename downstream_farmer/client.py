@@ -3,17 +3,15 @@
 from __future__ import print_function
 
 import io
-import os
 import json
-import random
-import hashlib
 
 import requests
 from heartbeat import Heartbeat
 from RandomIO import RandomIO
 
-from .utils import urlify, handle_json_response
+from .utils import handle_json_response
 from .exc import DownstreamError
+
 
 class Contract(object):
     def __init__(self, hash, seed, size, challenge, tag):
@@ -22,6 +20,7 @@ class Contract(object):
         self.size = size
         self.challenge = challenge
         self.tag = tag
+
 
 class DownstreamClient(object):
     def __init__(self, address):
@@ -34,14 +33,14 @@ class DownstreamClient(object):
     def connect(self, url):
         self.server = url.strip('/')
         url = '{0}/api/downstream/new/{1}'.format(self.server, self.address)
-        
+
         resp = requests.get(url)
         r_json = handle_json_response(resp)
-        
-        for k in ['token','heartbeat']:
+
+        for k in ['token', 'heartbeat']:
             if (k not in r_json):
                 raise DownstreamError('Malformed response from server.')
-        
+
         self.token = r_json['token']
         self.heartbeat = Heartbeat.fromdict(r_json['heartbeat'])
 
@@ -54,7 +53,7 @@ class DownstreamClient(object):
         for k in ['file_hash', 'seed', 'size', 'challenge', 'tag']:
             if (k not in r_json):
                 raise DownstreamError('Malformed response from server.')
-        
+
         self.contract = Contract(
             r_json['file_hash'],
             r_json['seed'],
@@ -65,9 +64,9 @@ class DownstreamClient(object):
     def answer_challenge(self):
         if (self.contract is None):
             raise DownstreamError('No contract to answer.')
-    
+
         contract = self.contract
-    
+
         url = '{0}/api/downstream/answer/{1}/{2}'.format(self.server,
                                                          self.token,
                                                          contract.hash)
@@ -75,19 +74,18 @@ class DownstreamClient(object):
         with io.BytesIO(RandomIO(contract.seed).read(contract.size)) as f:
             proof = self.heartbeat.prove(f, contract.challenge, contract.tag)
 
-        data = { 
-            'proof': proof.todict() 
+        data = {
+            'proof': proof.todict()
         }
         headers = {
             'Content-Type': 'application/json'
         }
-        
+
         resp = requests.post(url, data=json.dumps(data), headers=headers)
         r_json = handle_json_response(resp)
-        
+
         if ('status' not in r_json):
             raise DownstreamError('Malformed response from server.')
-        
+
         if (r_json['status'] != 'ok'):
             raise DownstreamError('Challenge response rejected.')
-

@@ -24,7 +24,7 @@ def urlify(string):
     """
     return quote(string)
 
-    
+
 def handle_json_response(resp):
     try:
         resp.raise_for_status()

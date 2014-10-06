@@ -28,7 +28,7 @@ def run_prototype(url):
         # generate a blank address...
         test_address = base58.b58encode_check(b'\x00'+os.urandom(20))
         client = DownstreamClient(test_address)
-    
+
         print('Connect to server')
         client.connect(url)
 
@@ -39,7 +39,7 @@ def run_prototype(url):
         client.answer_challenge()
 
         print('Verification successful!')
-        
+
     except DownstreamError as e:
         fail_exit(e.message)
 
