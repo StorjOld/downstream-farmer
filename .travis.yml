@@ -22,8 +22,7 @@
 
   before_script:
     - 'mysql -e "create database if not exists downstream;" -u root'
-    - "python node/runapp.py --initdb"
-    - "nohup python node/runapp.py &"
+    - "cd node; python runapp.py --initdb; nohup python runapp.py &; cd .."
   
   after_success:
     - coveralls
