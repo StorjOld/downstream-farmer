@@ -10,9 +10,9 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 `downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, installs its own dependencies.
 
 ```
-$ git clone git+https://github.com/Storj/downstream-farmer.git
+$ git clone -b devel https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
-$ pip install .
+$ pip install -r requirements.txt .
 ```
 
 Here is a sample command if you are already running [downstream-node](https://github.com/Storj/downstream-node) locally:
