@@ -18,11 +18,11 @@
     - "pip install flake8 coverage coveralls"
     - "pip install -r requirements.txt ."
     - "git clone -b devel https://github.com/wiggzz/downstream-node.git node"
-    - "cd node; pip install -r requirements.txt .; cd .."
+    - "cd node ; pip install -r requirements.txt . ; cd .."
 
   before_script:
     - 'mysql -e "create database if not exists downstream;" -u root'
-    - "cd node; python runapp.py --initdb; nohup python runapp.py &; cd .."
+    - "cd node; python runapp.py --initdb ; nohup python runapp.py & >/dev/null; cd .."
   
   after_success:
     - coveralls
@@ -32,7 +32,6 @@
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
     - "downstream 'http://localhost:5000'"
-    - cat nohup.out
 
 #  notifications:
 #    slack: storj:IwoHonDxA5lauvwcKZRMkfps
