@@ -31,6 +31,10 @@ class DownstreamClient(object):
         self.contract = None
 
     def connect(self, url):
+        """Connects to a downstream-node server.
+        
+        :param url: the node url, e.g. https://localhost:5000/
+        """
         self.server = url.strip('/')
         url = '{0}/api/downstream/new/{1}'.format(self.server, self.address)
 
@@ -45,6 +49,8 @@ class DownstreamClient(object):
         self.heartbeat = Heartbeat.fromdict(r_json['heartbeat'])
 
     def get_chunk(self):
+        """Gets a chunk contract from the connected node
+        """
         url = '{0}/api/downstream/chunk/{1}'.format(self.server, self.token)
 
         resp = requests.get(url)
@@ -62,6 +68,8 @@ class DownstreamClient(object):
             Heartbeat.tag_type().fromdict(r_json['tag']))
 
     def answer_challenge(self):
+        """Answers the chunk contract for the connected node.
+        """
         if (self.contract is None):
             raise DownstreamError('No contract to answer.')
 
