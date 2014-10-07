@@ -32,7 +32,7 @@ class DownstreamClient(object):
 
     def connect(self, url):
         """Connects to a downstream-node server.
-        
+
         :param url: the node url, e.g. https://localhost:5000/
         """
         self.server = url.strip('/')
