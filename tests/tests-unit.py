@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
 import sys
 import unittest
+import base58
+import binascii
 from argparse import Namespace
 try:
     from urllib2 import URLError
@@ -12,8 +15,9 @@ import mock
 import requests
 
 from downstream_farmer import utils, shell
-from downstream_farmer.client import DownstreamClient
+from downstream_farmer.client import DownstreamClient, Contract
 from downstream_farmer.exc import DownstreamError, Py3kException, ConnectError
+from heartbeat import Heartbeat
 
 
 class TestUtils(unittest.TestCase):
@@ -22,117 +26,134 @@ class TestUtils(unittest.TestCase):
         result = utils.urlify(test_str)
         self.assertEqual('arbitrary%20strings%20%27n%20shit', result)
 
+    def test_handle_json_response(self):
+        m = mock.MagicMock()
+        m.raise_for_status.side_effect = Exception("Test")
+        with self.assertRaises(DownstreamError) as ex:
+            utils.handle_json_response(m)
+        
+        m = mock.MagicMock()
+        m.json.side_effect = ValueError
+        with self.assertRaises(DownstreamError) as ex:
+            utils.handle_json_response(m)
+        
+        m = mock.MagicMock()
+        result = utils.handle_json_response(m)
 
+class TestContract(unittest.TestCase):
+    def setUp(self):
+        self.challenge = Heartbeat.challenge_type()()
+        self.tag = Heartbeat.tag_type()()
+        self.contract = Contract('hash',
+                                 'seed',
+                                 12345,
+                                 self.challenge,
+                                 self.tag)
+    
+    def tearDown(self):
+        pass
+    
+    def test_initialization(self):
+        self.assertEqual(self.contract.hash,'hash')
+        self.assertEqual(self.contract.seed,'seed')
+        self.assertEqual(self.contract.size,12345)
+        self.assertEqual(self.contract.challenge,self.challenge)
+        self.assertEqual(self.contract.tag,self.tag)
+        
 class TestClient(unittest.TestCase):
     def setUp(self):
         self.server_url = 'https://test.url/'
-        self.client = DownstreamClient(self.server_url)
-        self.testfile = 'tests/thirty-two_meg.testfile'
+        self.address = base58.b58encode_check(b'\x00'+os.urandom(20))
+        self.client = DownstreamClient(self.address)
+        self.test_contract = Contract(MockValues.get_chunk_response['file_hash'],
+                                      MockValues.get_chunk_response['seed'],
+                                      MockValues.get_chunk_response['size'],
+                                      Heartbeat.challenge_type().fromdict(
+                                        MockValues.get_chunk_response['challenge']),
+                                      Heartbeat.tag_type().fromdict(
+                                        MockValues.get_chunk_response['tag']))
+        self.test_heartbeat = Heartbeat.fromdict(MockValues.connect_response['heartbeat'])
 
     def tearDown(self):
         pass
 
     def test_initialization(self):
-        self.assertEqual(self.client.server, self.server_url[:-1])
-        self.assertEqual(self.client.challenges, [])
+        self.assertEqual(self.client.address, self.address)
+        self.assertEqual(len(self.client.token),0)
+        self.assertEqual(len(self.client.server),0)
         self.assertIsNone(self.client.heartbeat)
+        self.assertIsNone(self.client.contract)
 
-    def test_connect(self):
-        with self.assertRaises(NotImplementedError):
-            self.client.connect(None)
-
-    def test_store_path(self):
-        with self.assertRaises(NotImplementedError):
-            self.client.store_path(None)
-
-    def test_get_chunk(self):
-        with self.assertRaises(NotImplementedError):
-            self.client.get_chunk(None)
-
-    def test_challenge(self):
-        with self.assertRaises(NotImplementedError):
-            self.client.challenge(None, None)
-
-    def test_answer(self):
-        with self.assertRaises(NotImplementedError):
-            self.client.answer(None, None)
-
-    def test_enc_fname(self):
-        test_file = '/path/to/my test.file'
-        result = self.client._enc_fname(test_file)
-        self.assertEqual('my%20test.file', result)
-
-    @mock.patch('downstream_farmer.client.requests')
-    def test_get_challenges_server(self, requests):
-        inst = requests.get.return_value
-        inst.raise_for_status.side_effect = Exception('Test')
-        with self.assertRaises(DownstreamError) as ex:
-            self.client.get_challenges(self.testfile)
-        self.assertEqual(ex.exception.message, 'Error connecting to downstream-node: Test')
-
-    @mock.patch('downstream_farmer.client.requests')
-    def test_get_challenges_json(self, requests):
-        inst = requests.get.return_value
-        inst.json.side_effect = ValueError
-        with self.assertRaises(DownstreamError) as ex:
-            self.client.get_challenges(self.testfile)
-        self.assertEqual(ex.exception.message, 'Invalid response from Downstream node.')
-
-    def test_get_challenges_working(self):
+    def test_connect_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
-            inst.json.return_value = MockValues.response
-            self.client.get_challenges(self.testfile)
-        self.assertEqual(len(MockValues.response['challenges']),
-                         len(self.client.challenges))
-
-    def test_answer_challenge(self):
-        with mock.patch('downstream_farmer.client.os.path.isfile') as patch:
-            patch.side_effect = AssertionError
+            inst.json.return_value = {"invalid":"dict"}
             with self.assertRaises(DownstreamError) as ex:
-                self.client.answer_challenge(self.testfile)
-        msg = ex.exception.message
-        self.assertEqual(msg, 'tests/thirty-two_meg.testfile is not a valid file')
+                self.client.connect(self.server_url)
+            self.assertEqual(str(ex.exception),'Malformed response from server.')
 
+    def test_connect_working(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
-            inst.json.return_value = MockValues.response
-            self.client.get_challenges(self.testfile)
-        self.assertEqual(len(MockValues.response['challenges']),
-                         len(self.client.challenges))
+            inst.json.return_value = MockValues.connect_response
+            self.client.connect(self.server_url)
+        self.assertEqual(self.client.token,MockValues.connect_response['token'])
+        self.assertEqual(self.client.heartbeat,
+                         Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
 
-        with mock.patch('downstream_farmer.client.requests.post') as patch:
-            resp = patch.return_value
-            resp.json.side_effect = ValueError
-            result = self.client.answer_challenge(self.testfile)
-            self.assertEqual(result, {})
-
-        with mock.patch('downstream_farmer.client.requests.post') as patch:
-            resp = patch.return_value
-            resp.json.return_value = {'msg': 'epic fail'}
-            resp.status_code = 400
-            resp.raise_for_status.side_effect = requests.exceptions.HTTPError
+    def test_get_chunk_malformed(self):
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"invalid":"dict"}
             with self.assertRaises(DownstreamError) as ex:
-                self.client.answer_challenge(self.testfile)
-            msg = ex.exception.message
-            self.assertEqual(
-                msg, 'Error reponse from Downstream node: 400 epic fail')
+                self.client.get_chunk()
+            self.assertEqual(str(ex.exception),'Malformed response from server.')
 
-        with mock.patch('downstream_farmer.client.requests.post') as patch:
-            resp = patch.return_value
-            resp.json.return_value = MockValues.challenge_answer
-            result = self.client.answer_challenge(self.testfile)
-            self.assertEqual(result, MockValues.challenge_answer)
-
-    def test_random_challenge(self):
+    def test_get_chunk_working(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
-            inst.json.return_value = MockValues.response
-            self.client.get_challenges(self.testfile)
-        result = self.client.random_challenge()
-        self.assertIn(result, self.client.challenges)
+            inst.json.return_value = MockValues.get_chunk_response
+            self.client.get_chunk()
+        self.assertEqual(self.client.contract.hash, self.test_contract.hash)
+        self.assertEqual(self.client.contract.seed, self.test_contract.seed)
+        self.assertEqual(self.client.contract.size, self.test_contract.size)
+        self.assertEqual(self.client.contract.challenge, self.test_contract.challenge)
+        self.assertEqual(self.client.contract.tag, self.test_contract.tag)
 
-
+    def test_answer_no_contract(self):
+        self.client.contract = None
+        with self.assertRaises(DownstreamError) as ex:
+            self.client.answer_challenge()
+        self.assertEqual(str(ex.exception),'No contract to answer.')
+        
+    def test_answer_malformed(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.post') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"invalid":"dict"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.answer_challenge()
+            self.assertEqual(str(ex.exception),'Malformed response from server.')
+    
+    def test_answer_invalid(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.post') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"status":"dict"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.answer_challenge()
+            self.assertEqual(str(ex.exception),'Challenge response rejected.')
+            
+    def test_answer_working(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.post') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"status":"ok"}
+            self.client.answer_challenge()
+    
 class TestExceptions(unittest.TestCase):
     def test_py3kexception(self):
         e = Py3kException('Test Exception')
@@ -179,16 +200,27 @@ class TestShell(unittest.TestCase):
                 shell.eval_args(m)
             self.assertTrue(check.called)
 
-        with mock.patch('downstream_farmer.shell.check_connectivity'):
-            with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
+        with mock.patch('downstream_farmer.shell.check_connectivity'):            
+            with mock.patch('downstream_farmer.shell.run_prototype') as rp:
                 shell.eval_args(m)
-                self.assertTrue(dc.called)
+                self.assertTrue(rp.called)
 
-                m.verify_ownership = True
-                with mock.patch('downstream_farmer.shell.verify_ownership') as vo:
-                    shell.eval_args(m)
-                    self.assertTrue(vo.called)
-
+    def test_run_prototype(self):
+        m = mock.Mock()
+        with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
+            inst = dc.return_value
+            inst.connect.side_effect = DownstreamError('Error')
+            with self.assertRaises(SystemExit):
+                shell.run_prototype(m)
+            
+        with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
+            shell.run_prototype(m)
+            inst = dc.return_value
+            self.assertTrue(dc.called)
+            self.assertTrue(inst.connect.called)
+            self.assertTrue(inst.get_chunk.called)
+            self.assertTrue(inst.answer_challenge.called)
+                    
     def test_check_connectivity(self):
         with mock.patch('downstream_farmer.shell.urlopen') as patch:
             patch.side_effect = URLError('Problem')
@@ -198,106 +230,40 @@ class TestShell(unittest.TestCase):
         with mock.patch('downstream_farmer.shell.urlopen'):
             result = shell.check_connectivity(None)
             self.assertIsNone(result)
-
-    def test_verify_ownership(self):
-        m = mock.MagicMock()
-        m.get_challenges.side_effect = DownstreamError('Oh snap')
-        with self.assertRaises(SystemExit):
-            shell.verify_ownership(m, None)
-
-        m = mock.MagicMock()
-        m.answer_challenge.side_effect = DownstreamError('Oh fudge')
-        with self.assertRaises(SystemExit):
-            shell.verify_ownership(m, None)
-
-        m = mock.MagicMock()
-        result = shell.verify_ownership(m, None)
-        self.assertIsNone(result)
-
+            
+    def test_main(self):
+        with mock.patch('downstream_farmer.shell.parse_args') as pa:
+            with mock.patch('downstream_farmer.shell.eval_args') as ea:
+                shell.main()
+                self.assertTrue(pa.called)
+                self.assertTrue(ea.called)
+                
     def test_fail_exit(self):
         with self.assertRaises(SystemExit):
             shell.fail_exit('Test')
 
 
 class MockValues:
-    response = {
-        "challenges": [
-            {
-                "block": 3117129,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "767bbdd1ea1174b1d6ec0168d27f1d167a28def3ed985773f78915e28f44086c"
-            },
-            {
-                "block": 33325195,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "2bd3debc7bcea5c907a5e507abcd5e2a225c8aa1b6699c7861e3763657fc75f8"
-            },
-            {
-                "block": 2012152,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "75406dd8f6246553dd0685373a2e25e090fbf8d4a6f853aceea08d0d717a57fa"
-            },
-            {
-                "block": 18367663,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "77629c499da7dd50c9a96ae34137510a294ba286657fc7e954844e14f98cbdfb"
-            },
-            {
-                "block": 28897911,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "8c1098d75f9f4768b231acf6a358c7e096b2bb7f629f1131113c7ecf9df2e21e"
-            },
-            {
-                "block": 5726630,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "a2b691a3897db1656432f39caaccab72d64c16e3976543b3953cf251a370d6c8"
-            },
-            {
-                "block": 25814394,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "7ae97605df3ba0994bef0dd4ec929ceed7e6bf66a2a25109ce4d0a97a4d83d52"
-            },
-            {
-                "block": 26668230,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "96ba083338cc902b04d8c11ef641eea0f12604c5953e3b2f7f0644869e713221"
-            },
-            {
-                "block": 4829621,
-                "filename": "thirty-two_meg.testfile",
-                "rootseed":
-                    "d10d510e1ff1f61ad8aa051fca3bbdbd93f8b6534cf04beadfc52c6229a621bd",
-                "seed":
-                    "ccfef476a18df028f3e978efc788d4d7c2c088c7c91cc376679d1799fe9a1bb0"
-            },
-        ]
+    connect_response = {
+        "heartbeat": "AQoAAACAAAAAgAAAAJCTCchnuw8nE9FbjUyJVNNzjQumBHHw7iFL5Ply"
+                     "4vHQvkqOqcgc5XKXgWVaJGCs1F+oI68zL9Ir9+q0BkA5WadDq5uz0Cot"
+                     "sY8Pad8UemCLvLGNlnkavsbn0dXk7/0QL5KYGardu9m5zWtQEagdvl86"
+                     "tSbksec1B5Y9K1S5hGlr",
+        "token": "b45a3e2932c87474cb1bd7e642cf792b"
     }
 
-    challenge_answer = {
-        'msg': 'ok',
-        'match': True
+    get_chunk_response = {
+        "challenge": "AQAAACAAAACJwjEuYPkbnGOppNVgG0Xc5GKgp0g2kGN2bMCssbMBwIAA"
+                     "AACQkwnIZ7sPJxPRW41MiVTTc40LpgRx8O4hS+T5cuLx0L5KjqnIHOVy"
+                     "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
+                     "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
+                     "uYRpaw==",
+        "expiration": "2014-10-06T11:49:57",
+        "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
+                     "91ce7732",
+        "seed": "eb1bb0f7cd24720d456193cca8c42edb",
+        "size": 100,
+        "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
+               "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
+               "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
     }

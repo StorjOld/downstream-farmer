@@ -1,7 +1,8 @@
 from setuptools import setup
 
-from downstream_farmer import __version__
-
+with open('downstream_farmer/version.py','r') as f:
+    exec(f.read())
+    
 setup(
     name='downstream-farmer',
     version=__version__,
@@ -12,11 +13,9 @@ setup(
     author_email='info@storj.io',
     description='Client software for a Storj farmer',
     install_requires=[
+        'RandomIO',
         'requests',
-        'heartbeat==0.1.2'
-    ],
-    dependency_links=[
-        'git+https://github.com/Storj/heartbeat.git@v0.1.2#egg=heartbeat-0.1.2'
+        'storj-heartbeat'
     ],
     entry_points={
         'console_scripts': [

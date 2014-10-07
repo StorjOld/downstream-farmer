@@ -11,16 +11,18 @@
   services:
     - mysql
 
+  before_install:
+    - sudo apt-get install libcrypto++-dev
+    
   install:
     - "pip install flake8 coverage coveralls"
-    - "pip install --process-dependency-links ."
-    - "git clone https://github.com/Storj/downstream-node.git node"
-    - "cd node; pip install .; cd .."
+    - "pip install -r requirements.txt ."
+    - "git clone -b devel https://github.com/storj/downstream-node.git node"
+    - "cd node ; pip install -r requirements.txt . ; cd .."
 
   before_script:
     - 'mysql -e "create database if not exists downstream;" -u root'
-    - "python node/runapp.py --initdb"
-    - "nohup python node/runapp.py & > /dev/null"
+    - "cd node; python runapp.py --initdb ; nohup python runapp.py & >/dev/null; cd .."
   
   after_success:
     - coveralls
@@ -28,8 +30,8 @@
   # command to run tests
   script:
     - "flake8 downstream_farmer/"
-    - "nosetests -v --with-coverage --cover-package=downstream_farmer -cover-branches --cover-min-percentage=90 tests/"
-    - "downstream --verify-ownership tests/thirty-two_meg.testfile 'http://localhost:5000'"
+    - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
+    - "downstream 'http://localhost:5000'"
 
-  notifications:
-    slack: storj:IwoHonDxA5lauvwcKZRMkfps
+#  notifications:
+#    slack: storj:IwoHonDxA5lauvwcKZRMkfps

@@ -1,2 +1,4 @@
 requests
-git+https://github.com/Storj/heartbeat.git@v0.1.2
+
+-e git+https://github.com/Storj/heartbeat.git#egg=storj-heartbeat
+-e git+https://github.com/Storj/RandomIO.git#egg=RandomIO

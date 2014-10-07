@@ -1,10 +1,8 @@
 downstream-farmer
 =================
 
-## Build Status
-
-Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer) 
-Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer)
+Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=master)](https://travis-ci.org/Storj/downstream-farmer)  [![Coverage Status](https://img.shields.io/coveralls/Storj/downstream-farmer.svg)](https://coveralls.io/r/Storj/downstream-farmer?branch=master)
+Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer) [![Coverage Status](https://img.shields.io/coveralls/Storj/downstream-farmer.svg)](https://coveralls.io/r/Storj/downstream-farmer?branch=devel)
 
 ## Test Coverage
 
@@ -21,6 +19,14 @@ $ pip install --process-dependency-links git+https://github.com/Storj/downstream
 
 ```
 $ downstream --verify-ownership tests/thirty-two_meg.testfile 'http://address.to.farmer.node:5000'
+```
+
+Note that `tests/thirty-two_meg.testfile` must exist relative to the directory your run the command in. This file is avaible in [downstream-node](https://github.com/Storj/downstream-node) and [downstream-farmer](https://github.com/Storj/downstream-farmer). You can download it directly [here](https://github.com/Storj/downstream-farmer/raw/master/tests/thirty-two_meg.testfile). 
+
+Here is a sample command if you are already running [downstream-node](https://github.com/Storj/downstream-node) locally:
+```
+wget https://github.com/Storj/downstream-farmer/raw/master/tests/thirty-two_meg.testfile
+downstream --verify-ownership thirty-two_meg.testfile 'http://localhost:5000'
 ```
 
 **If this is at all confusing, we're doing it as a functional test in the travis.yml file, so watch it in action on Travis-CI.**
