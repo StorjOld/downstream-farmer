@@ -225,6 +225,7 @@ class TestShell(unittest.TestCase):
 
         with mock.patch('downstream_farmer.shell.check_connectivity'):            
             with mock.patch('downstream_farmer.shell.run_prototype') as rp:
+                m.number = 2
                 shell.eval_args(m)
                 self.assertTrue(rp.called)
 
@@ -234,15 +235,16 @@ class TestShell(unittest.TestCase):
             inst = dc.return_value
             inst.connect.side_effect = DownstreamError('Error')
             with self.assertRaises(SystemExit):
-                shell.run_prototype(m)
+                shell.run_prototype(m,1)
             
         with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
-            shell.run_prototype(m)
+            shell.run_prototype(m,1)
             inst = dc.return_value
             self.assertTrue(dc.called)
             self.assertTrue(inst.connect.called)
             self.assertTrue(inst.get_chunk.called)
             self.assertTrue(inst.answer_challenge.called)
+            self.assertTrue(inst.get_challenge.called)
                     
     def test_check_connectivity(self):
         with mock.patch('downstream_farmer.shell.urlopen') as patch:
