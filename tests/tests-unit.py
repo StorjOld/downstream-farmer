@@ -91,6 +91,16 @@ class TestClient(unittest.TestCase):
             with self.assertRaises(DownstreamError) as ex:
                 self.client.connect(self.server_url)
             self.assertEqual(str(ex.exception),'Malformed response from server.')
+    
+    def test_connect_invalid_heartbeat(self):
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"heartbeat":"test heartbeat",
+                                      "token":"test token",
+                                      "type":"invalid type"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.connect(self.server_url)
+            self.assertEqual(str(ex.exception),'Unknown Heartbeat Type')
 
     def test_connect_working(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -110,6 +120,7 @@ class TestClient(unittest.TestCase):
             self.assertEqual(str(ex.exception),'Malformed response from server.')
 
     def test_get_chunk_working(self):
+        self.client.heartbeat = self.test_heartbeat
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
             inst.json.return_value = MockValues.get_chunk_response
@@ -138,6 +149,7 @@ class TestClient(unittest.TestCase):
 
     def test_challenge_working(self):
         self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
             inst.json.return_value = MockValues.get_challenge_response
@@ -274,7 +286,8 @@ class MockValues:
                      "4vHQvkqOqcgc5XKXgWVaJGCs1F+oI68zL9Ir9+q0BkA5WadDq5uz0Cot"
                      "sY8Pad8UemCLvLGNlnkavsbn0dXk7/0QL5KYGardu9m5zWtQEagdvl86"
                      "tSbksec1B5Y9K1S5hGlr",
-        "token": "b45a3e2932c87474cb1bd7e642cf792b"
+        "token": "b45a3e2932c87474cb1bd7e642cf792b",
+        "type": "SwPriv"
     }
 
     get_chunk_response = {
