@@ -120,6 +120,29 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.contract.challenge, self.test_contract.challenge)
         self.assertEqual(self.client.contract.tag, self.test_contract.tag)
 
+    def test_challenge_no_contract(self):
+        self.client.contract = None
+        with self.assertRaises(DownstreamError) as ex:
+            self.client.get_challenge()
+        self.assertEqual(str(ex.exception),'No contract to get a new challenge for.')
+
+    def test_challenge_malformed(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"invalid":"dict"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.get_challenge()
+            self.assertEqual(str(ex.exception),'Malformed response from server.')
+
+    def test_challenge_working(self):
+        self.client.contract = self.test_contract
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = MockValues.get_challenge_response
+            self.client.get_challenge()
+            
     def test_answer_no_contract(self):
         self.client.contract = None
         with self.assertRaises(DownstreamError) as ex:
@@ -266,4 +289,13 @@ class MockValues:
         "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
                "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
                "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
+    }
+    
+    get_challenge_response = {
+        "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
+                     "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
+                     "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
+                     "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
+                     "FU58Vw==",
+        "expiration": "2014-10-09T14:57:11"
     }

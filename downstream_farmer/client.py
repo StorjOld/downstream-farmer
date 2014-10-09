@@ -66,6 +66,28 @@ class DownstreamClient(object):
             r_json['size'],
             Heartbeat.challenge_type().fromdict(r_json['challenge']),
             Heartbeat.tag_type().fromdict(r_json['tag']))
+            
+    def get_challenge(self):
+        """Gets a new challenge from the connected node
+        """
+        if (self.contract is None):
+            raise DownstreamError('No contract to get a new challenge for.')
+
+        url = '{0}/api/downstream/challenge/{1}/{2}'.format(self.server,
+                                                            self.token,
+                                                            self.contract.hash)
+
+        resp = requests.get(url)
+
+        r_json = handle_json_response(resp)
+
+        for k in ['challenge', 'expiration']:
+            if (k not in r_json):
+                raise DownstreamError('Malformed response from server.')
+
+        self.contract.challenge \
+            = Heartbeat.challenge_type().fromdict(r_json['challenge'])
+
 
     def answer_challenge(self):
         """Answers the chunk contract for the connected node.
