@@ -6,7 +6,7 @@ import io
 import json
 
 import requests
-from heartbeat import Heartbeat
+import heartbeat
 from RandomIO import RandomIO
 
 from .utils import handle_json_response
@@ -20,6 +20,9 @@ class Contract(object):
         self.size = size
         self.challenge = challenge
         self.tag = tag
+
+heartbeat_types = {'SwPriv': heartbeat.SwPriv.SwPriv,
+                   'Merkle': heartbeat.Merkle.Merkle}
 
 
 class DownstreamClient(object):
@@ -41,12 +44,16 @@ class DownstreamClient(object):
         resp = requests.get(url)
         r_json = handle_json_response(resp)
 
-        for k in ['token', 'heartbeat']:
+        for k in ['token', 'heartbeat', 'type']:
             if (k not in r_json):
                 raise DownstreamError('Malformed response from server.')
 
+        if r_json['type'] not in heartbeat_types.keys():
+            raise DownstreamError('Unknown Heartbeat Type')
+
         self.token = r_json['token']
-        self.heartbeat = Heartbeat.fromdict(r_json['heartbeat'])
+        self.heartbeat \
+            = heartbeat_types[r_json['type']].fromdict(r_json['heartbeat'])
 
     def get_chunk(self):
         """Gets a chunk contract from the connected node
@@ -64,8 +71,29 @@ class DownstreamClient(object):
             r_json['file_hash'],
             r_json['seed'],
             r_json['size'],
-            Heartbeat.challenge_type().fromdict(r_json['challenge']),
-            Heartbeat.tag_type().fromdict(r_json['tag']))
+            self.heartbeat.challenge_type().fromdict(r_json['challenge']),
+            self.heartbeat.tag_type().fromdict(r_json['tag']))
+
+    def get_challenge(self):
+        """Gets a new challenge from the connected node
+        """
+        if (self.contract is None):
+            raise DownstreamError('No contract to get a new challenge for.')
+
+        url = '{0}/api/downstream/challenge/{1}/{2}'.format(self.server,
+                                                            self.token,
+                                                            self.contract.hash)
+
+        resp = requests.get(url)
+
+        r_json = handle_json_response(resp)
+
+        for k in ['challenge', 'expiration']:
+            if (k not in r_json):
+                raise DownstreamError('Malformed response from server.')
+
+        self.contract.challenge \
+            = self.heartbeat.challenge_type().fromdict(r_json['challenge'])
 
     def answer_challenge(self):
         """Answers the chunk contract for the connected node.

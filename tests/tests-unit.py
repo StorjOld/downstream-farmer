@@ -91,6 +91,16 @@ class TestClient(unittest.TestCase):
             with self.assertRaises(DownstreamError) as ex:
                 self.client.connect(self.server_url)
             self.assertEqual(str(ex.exception),'Malformed response from server.')
+    
+    def test_connect_invalid_heartbeat(self):
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"heartbeat":"test heartbeat",
+                                      "token":"test token",
+                                      "type":"invalid type"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.connect(self.server_url)
+            self.assertEqual(str(ex.exception),'Unknown Heartbeat Type')
 
     def test_connect_working(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -110,6 +120,7 @@ class TestClient(unittest.TestCase):
             self.assertEqual(str(ex.exception),'Malformed response from server.')
 
     def test_get_chunk_working(self):
+        self.client.heartbeat = self.test_heartbeat
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
             inst.json.return_value = MockValues.get_chunk_response
@@ -120,6 +131,30 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.contract.challenge, self.test_contract.challenge)
         self.assertEqual(self.client.contract.tag, self.test_contract.tag)
 
+    def test_challenge_no_contract(self):
+        self.client.contract = None
+        with self.assertRaises(DownstreamError) as ex:
+            self.client.get_challenge()
+        self.assertEqual(str(ex.exception),'No contract to get a new challenge for.')
+
+    def test_challenge_malformed(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = {"invalid":"dict"}
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.get_challenge()
+            self.assertEqual(str(ex.exception),'Malformed response from server.')
+
+    def test_challenge_working(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = MockValues.get_challenge_response
+            self.client.get_challenge()
+            
     def test_answer_no_contract(self):
         self.client.contract = None
         with self.assertRaises(DownstreamError) as ex:
@@ -200,8 +235,12 @@ class TestShell(unittest.TestCase):
                 shell.eval_args(m)
             self.assertTrue(check.called)
 
-        with mock.patch('downstream_farmer.shell.check_connectivity'):            
+        with mock.patch('downstream_farmer.shell.check_connectivity'):
+            m.number = 0
+            with self.assertRaises(SystemExit):
+                shell.eval_args(m)
             with mock.patch('downstream_farmer.shell.run_prototype') as rp:
+                m.number = 2
                 shell.eval_args(m)
                 self.assertTrue(rp.called)
 
@@ -211,15 +250,16 @@ class TestShell(unittest.TestCase):
             inst = dc.return_value
             inst.connect.side_effect = DownstreamError('Error')
             with self.assertRaises(SystemExit):
-                shell.run_prototype(m)
+                shell.run_prototype(m,1)
             
         with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
-            shell.run_prototype(m)
+            shell.run_prototype(m,1)
             inst = dc.return_value
             self.assertTrue(dc.called)
             self.assertTrue(inst.connect.called)
             self.assertTrue(inst.get_chunk.called)
             self.assertTrue(inst.answer_challenge.called)
+            self.assertTrue(inst.get_challenge.called)
                     
     def test_check_connectivity(self):
         with mock.patch('downstream_farmer.shell.urlopen') as patch:
@@ -249,7 +289,8 @@ class MockValues:
                      "4vHQvkqOqcgc5XKXgWVaJGCs1F+oI68zL9Ir9+q0BkA5WadDq5uz0Cot"
                      "sY8Pad8UemCLvLGNlnkavsbn0dXk7/0QL5KYGardu9m5zWtQEagdvl86"
                      "tSbksec1B5Y9K1S5hGlr",
-        "token": "b45a3e2932c87474cb1bd7e642cf792b"
+        "token": "b45a3e2932c87474cb1bd7e642cf792b",
+        "type": "SwPriv"
     }
 
     get_chunk_response = {
@@ -266,4 +307,13 @@ class MockValues:
         "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
                "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
                "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
+    }
+    
+    get_challenge_response = {
+        "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
+                     "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
+                     "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
+                     "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
+                     "FU58Vw==",
+        "expiration": "2014-10-09T14:57:11"
     }

@@ -23,7 +23,7 @@ def fail_exit(msg, exit_code=1):
     sys.exit(exit_code)
 
 
-def run_prototype(url):
+def run_prototype(url, number):
     try:
         # generate a blank address...
         test_address = base58.b58encode_check(b'\x00'+os.urandom(20))
@@ -35,8 +35,10 @@ def run_prototype(url):
         print('Fetching contract')
         client.get_chunk()
 
-        print('Answering challenge')
-        client.answer_challenge()
+        for i in range(0, number):
+            print('Answering challenge {0}'.format(i+1))
+            client.answer_challenge()
+            client.get_challenge()
 
         print('Verification successful!')
 
@@ -60,7 +62,10 @@ def eval_args(args):
     except ConnectError as e:
         fail_exit(e.message)
 
-    run_prototype(args.node_url)
+    if args.number <= 0:
+        fail_exit('Must specify one or more challenges')
+
+    run_prototype(args.node_url, args.number)
 
 
 def parse_args():
@@ -68,6 +73,8 @@ def parse_args():
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node_url', help='URL of the Downstream node')
+    parser.add_argument('-n', '--number', type=int,
+                        help='Number of challenges to perform')
     return parser.parse_args()
 
 
