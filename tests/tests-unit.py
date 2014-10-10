@@ -235,7 +235,10 @@ class TestShell(unittest.TestCase):
                 shell.eval_args(m)
             self.assertTrue(check.called)
 
-        with mock.patch('downstream_farmer.shell.check_connectivity'):            
+        with mock.patch('downstream_farmer.shell.check_connectivity'):
+            m.number = 0
+            with self.assertRaises(SystemExit):
+                shell.eval_args(m)
             with mock.patch('downstream_farmer.shell.run_prototype') as rp:
                 m.number = 2
                 shell.eval_args(m)
