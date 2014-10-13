@@ -91,10 +91,10 @@ class DownstreamClient(object):
             raise DownstreamError('No contract to get a new challenge for.')
 
         time_til_expiration = self.contract.expiration - datetime.utcnow()
-        print(time_til_expiration)
         if (time_til_expiration.total_seconds() > 0):
-            print('Current contract challenge not expired.')
             if (block):
+                print('Waiting {0} seconds until new challenge is available.'
+                      .format(time_til_expiration.total_seconds()))
                 # contract expiration is in the future...
                 # wait til contract expiration
                 time.sleep(time_til_expiration.total_seconds())

@@ -40,8 +40,8 @@ def run_prototype(url, number):
 
         i = 1
         while number == 0 or i < number:
-            print('Answering challenge {0}'.format(i+1))
             client.get_challenge()
+            print('Answering challenge {0}'.format(i))
             client.answer_challenge()
             i += 1
 
