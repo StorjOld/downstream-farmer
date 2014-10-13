@@ -35,10 +35,15 @@ def run_prototype(url, number):
         print('Fetching contract')
         client.get_chunk()
 
-        for i in range(0, number):
+        print('Answering challenge 0')
+        client.answer_challenge()
+
+        i = 1
+        while number == 0 or i < number:
             print('Answering challenge {0}'.format(i+1))
-            client.answer_challenge()
             client.get_challenge()
+            client.answer_challenge()
+            i += 1
 
         print('Verification successful!')
 
@@ -62,8 +67,8 @@ def eval_args(args):
     except ConnectError as e:
         fail_exit(e.message)
 
-    if args.number <= 0:
-        fail_exit('Must specify one or more challenges')
+    if args.number < 0:
+        fail_exit('Must specify a non-negative number of challenges.')
 
     run_prototype(args.node_url, args.number)
 
@@ -74,7 +79,9 @@ def parse_args():
                         version=__version__)
     parser.add_argument('node_url', help='URL of the Downstream node')
     parser.add_argument('-n', '--number', type=int,
-                        help='Number of challenges to perform')
+                        default=0,
+                        help='Number of challenges to perform.  '
+                        'If unspecified, perform challenges until killed.')
     return parser.parse_args()
 
 

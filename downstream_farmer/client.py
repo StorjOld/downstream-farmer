@@ -4,21 +4,24 @@ from __future__ import print_function
 
 import io
 import json
+import time
 
 import requests
 import heartbeat
 from RandomIO import RandomIO
+from datetime import datetime
 
 from .utils import handle_json_response
 from .exc import DownstreamError
 
 
 class Contract(object):
-    def __init__(self, hash, seed, size, challenge, tag):
+    def __init__(self, hash, seed, size, challenge, expiration, tag):
         self.hash = hash
         self.seed = seed
         self.size = size
         self.challenge = challenge
+        self.expiration = expiration
         self.tag = tag
 
 heartbeat_types = {'SwPriv': heartbeat.SwPriv.SwPriv,
@@ -72,13 +75,33 @@ class DownstreamClient(object):
             r_json['seed'],
             r_json['size'],
             self.heartbeat.challenge_type().fromdict(r_json['challenge']),
+            datetime.strptime(r_json['expiration'], '%Y-%m-%dT%H:%M:%S'),
             self.heartbeat.tag_type().fromdict(r_json['tag']))
 
-    def get_challenge(self):
-        """Gets a new challenge from the connected node
+    def get_challenge(self, block=True):
+        """Gets a new challenge from the connected node.
+
+        Checks that existing contract has expired before getting a new one
+        :param block: if block is True, waits until the old challenge has
+        expired before getting the new one.  Otherwise, if the old challenge
+        has not expired, returns None
+        :returns: the new contract
         """
         if (self.contract is None):
             raise DownstreamError('No contract to get a new challenge for.')
+
+        time_til_expiration = self.contract.expiration - datetime.utcnow()
+        print(time_til_expiration)
+        if (time_til_expiration.total_seconds() > 0):
+            print('Current contract challenge not expired.')
+            if (block):
+                # contract expiration is in the future...
+                # wait til contract expiration
+                time.sleep(time_til_expiration.total_seconds())
+            else:
+                return None
+
+        # now contract should be expired, we can get a new challenge
 
         url = '{0}/api/downstream/challenge/{1}/{2}'.format(self.server,
                                                             self.token,
@@ -94,6 +117,10 @@ class DownstreamClient(object):
 
         self.contract.challenge \
             = self.heartbeat.challenge_type().fromdict(r_json['challenge'])
+        self.contract.expiration \
+            = datetime.strptime(r_json['expiration'], '%Y-%m-%dT%H:%M:%S')
+
+        return self.contract
 
     def answer_challenge(self):
         """Answers the chunk contract for the connected node.

@@ -13,6 +13,7 @@ except ImportError:
 
 import mock
 import requests
+from datetime import datetime, timedelta
 
 from downstream_farmer import utils, shell
 from downstream_farmer.client import DownstreamClient, Contract
@@ -44,10 +45,12 @@ class TestContract(unittest.TestCase):
     def setUp(self):
         self.challenge = Heartbeat.challenge_type()()
         self.tag = Heartbeat.tag_type()()
+        self.expiration = datetime.utcnow()+timedelta(seconds=60)
         self.contract = Contract('hash',
                                  'seed',
                                  12345,
                                  self.challenge,
+                                 self.expiration,
                                  self.tag)
     
     def tearDown(self):
@@ -58,6 +61,7 @@ class TestContract(unittest.TestCase):
         self.assertEqual(self.contract.seed,'seed')
         self.assertEqual(self.contract.size,12345)
         self.assertEqual(self.contract.challenge,self.challenge)
+        self.assertEqual(self.contract.expiration,self.expiration)
         self.assertEqual(self.contract.tag,self.tag)
         
 class TestClient(unittest.TestCase):
@@ -70,6 +74,9 @@ class TestClient(unittest.TestCase):
                                       MockValues.get_chunk_response['size'],
                                       Heartbeat.challenge_type().fromdict(
                                         MockValues.get_chunk_response['challenge']),
+                                      datetime.strptime(
+                                        MockValues.get_chunk_response['expiration'],
+                                        '%Y-%m-%dT%H:%M:%S'),
                                       Heartbeat.tag_type().fromdict(
                                         MockValues.get_chunk_response['tag']))
         self.test_heartbeat = Heartbeat.fromdict(MockValues.connect_response['heartbeat'])
@@ -129,6 +136,7 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.contract.seed, self.test_contract.seed)
         self.assertEqual(self.client.contract.size, self.test_contract.size)
         self.assertEqual(self.client.contract.challenge, self.test_contract.challenge)
+        self.assertEqual(self.client.contract.expiration, self.test_contract.expiration)
         self.assertEqual(self.client.contract.tag, self.test_contract.tag)
 
     def test_challenge_no_contract(self):
@@ -146,6 +154,24 @@ class TestClient(unittest.TestCase):
             with self.assertRaises(DownstreamError) as ex:
                 self.client.get_challenge()
             self.assertEqual(str(ex.exception),'Malformed response from server.')
+    
+    def test_challenge_block_til_expired(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        self.client.contract.expiration = datetime.utcnow()+timedelta(seconds=3)
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = MockValues.get_challenge_response
+            self.assertIsNotNone(self.client.get_challenge())
+            
+    def test_challenge_no_block(self):
+        self.client.contract = self.test_contract
+        self.client.heartbeat = self.test_heartbeat
+        self.client.contract.expiration = datetime.utcnow()+timedelta(seconds=3)
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = MockValues.get_challenge_response
+            self.assertIsNone(self.client.get_challenge(block=False))
 
     def test_challenge_working(self):
         self.client.contract = self.test_contract
@@ -154,6 +180,13 @@ class TestClient(unittest.TestCase):
             inst = patch.return_value
             inst.json.return_value = MockValues.get_challenge_response
             self.client.get_challenge()
+            self.assertEqual(self.client.contract.challenge, 
+                             Heartbeat.challenge_type().fromdict(
+                                MockValues.get_challenge_response['challenge']))
+            self.assertEqual(self.client.contract.expiration,
+                             datetime.strptime(
+                                MockValues.get_challenge_response['expiration'],
+                                '%Y-%m-%dT%H:%M:%S'))
             
     def test_answer_no_contract(self):
         self.client.contract = None
@@ -236,7 +269,7 @@ class TestShell(unittest.TestCase):
             self.assertTrue(check.called)
 
         with mock.patch('downstream_farmer.shell.check_connectivity'):
-            m.number = 0
+            m.number = -1
             with self.assertRaises(SystemExit):
                 shell.eval_args(m)
             with mock.patch('downstream_farmer.shell.run_prototype') as rp:
@@ -253,7 +286,7 @@ class TestShell(unittest.TestCase):
                 shell.run_prototype(m,1)
             
         with mock.patch('downstream_farmer.shell.DownstreamClient') as dc:
-            shell.run_prototype(m,1)
+            shell.run_prototype(m,2)
             inst = dc.return_value
             self.assertTrue(dc.called)
             self.assertTrue(inst.connect.called)
