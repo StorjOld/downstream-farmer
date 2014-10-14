@@ -7,17 +7,18 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 
 ## What is this I don't even?
 
-`downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, installs its own dependencies.
+`downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, will require python-dev and libcrypto++-dev to install from source.
 
 ```
+$ sudo apt-get install python-dev libcrypto++-dev
 $ git clone -b devel https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
 $ pip install -r requirements.txt .
 ```
 
-Here is a sample command if you are already running [downstream-node](https://github.com/Storj/downstream-node) locally:
+And connect to our test node by running:
 ```
-$ downstream 'http://address.to.farmer.node:5000'
+$ downstream 'http://verify.driveshare.org'
 ```
 
 This prototype performs three simple functions.  It connects to the specified downstream-node, it requests a chunk (which also gives it the first chunk challenge), and then it answers the chunk challenge.
