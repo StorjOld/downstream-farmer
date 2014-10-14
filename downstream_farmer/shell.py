@@ -77,10 +77,12 @@ def parse_args():
     parser = argparse.ArgumentParser('downstream-farmer')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
-    parser.add_argument('node_url', help='URL of the Downstream node')
+    parser.add_argument('node_url', help='URL of the Downstream node',
+                        nargs='?',
+                        default='http://verify.driveshare.org')
     parser.add_argument('-n', '--number', type=int,
                         default=0,
-                        help='Number of challenges to perform.  '
+                        help='Number of challenges to perform. '
                         'If unspecified, perform challenges until killed.')
     return parser.parse_args()
 
