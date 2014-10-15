@@ -6,10 +6,8 @@ import unittest
 import base58
 import binascii
 from argparse import Namespace
-try:
-    from urllib2 import URLError
-except ImportError:
-    from urllib.error import URLError
+
+from six.moves.urllib.error import URLError
 
 import mock
 import requests

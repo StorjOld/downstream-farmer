@@ -2,10 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-try:
-    from urllib import quote
-except ImportError:
-    from urllib.parse import quote
+from six.moves.urllib.parse import quote
 
 from .exc import DownstreamError
 
