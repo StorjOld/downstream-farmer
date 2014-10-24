@@ -22,6 +22,10 @@
 
   before_script:
     - 'mysql -e "create database if not exists downstream;" -u root'
+    - "mkdir data && cd data"
+    - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
+    - "gunzip GeoLite2-City.mmdb.gz"
+    - "cd .."
     - "cd node; python runapp.py --initdb ; nohup python runapp.py & >/dev/null; cd .."
   
   after_success:
