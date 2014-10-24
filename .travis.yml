@@ -31,7 +31,7 @@
   script:
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
-    - "downstream -n 2 'http://localhost:5000'"
+    - "downstream -n 2 -a 179P2swc7dpqNw3rF6rZ8suc5PtP1H2JCw 'http://localhost:5000'"
 
   notifications:
     slack: storj:IwoHonDxA5lauvwcKZRMkfps
