@@ -26,7 +26,7 @@
     - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
     - "gunzip GeoLite2-City.mmdb.gz"
     - "cd .."
-    - "cd node; python runapp.py --initdb ; nohup python runapp.py & >out.txt; cd .."
+    - "cd node; python runapp.py --initdb ; python runapp.py & >out.txt; cd .."
   
   after_success:
     - coveralls
