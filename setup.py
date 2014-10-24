@@ -13,6 +13,7 @@ setup(
     author_email='info@storj.io',
     description='Client software for a Storj farmer',
     install_requires=[
+        'six',
         'requests',
         'base58',
         'RandomIO',
