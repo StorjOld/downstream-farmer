@@ -18,15 +18,15 @@
     - "pip install flake8 coverage coveralls"
     - "pip install -r requirements.txt ."
     - "git clone -b devel https://github.com/storj/downstream-node.git node"
-    - "cd node ; pip install -r requirements.txt . ; cd .."
-
-  before_script:
-    - 'mysql -e "create database if not exists downstream;" -u root'
+    - "cd node ; pip install -r requirements.txt ."
     - "mkdir data && cd data"
     - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
     - "gunzip GeoLite2-City.mmdb.gz"
     - "cd .."
-    - "cd node; python runapp.py --initdb ; python runapp.py & >out.txt; cd .."
+
+  before_script:
+    - 'mysql -e "create database if not exists downstream;" -u root'
+    - "cd node; python runapp.py --initdb ; nohup python runapp.py &; cd .."
   
   after_success:
     - coveralls
@@ -36,7 +36,6 @@
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
     - "downstream -n 2 -a 179P2swc7dpqNw3rF6rZ8suc5PtP1H2JCw 'http://localhost:5000'"
-    - cat node/out.txt
 
   notifications:
     slack: storj:IwoHonDxA5lauvwcKZRMkfps
