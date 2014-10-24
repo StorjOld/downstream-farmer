@@ -23,16 +23,28 @@ def urlify(string):
 
 
 def handle_json_response(resp):
-    try:
-        resp.raise_for_status()
-    except Exception as ex:
-        r_json = resp.json()
-        raise DownstreamError("Error fetching downstream"
-                              "-node response: %s" % str(ex))
+    """This function handles a response from the downstream-node server.
+    If the server responds with an error, we attempt to get the json item
+    'message' from the body.  if that fails, we just raise a regular http
+    error.
+    otherwise, if the server responds with a 200 'ok' message, we parse the
+    json.
 
-    try:
-        r_json = resp.json()
-    except:
-        raise DownstreamError('Invalid response from Downstream node.')
+    :param resp: the flask request response to handle
+    :returns: the parsed json as an object
+    """
+    if (resp.status_code != 200):
+        try:
+            # see if we have any json to parse
+            r_json = resp.json()
+            message = r_json['message']
+        except:
+            # if not, just raise the regular http error
+            resp.raise_for_status()
+        else:
+            raise DownstreamError(message)
+
+    # status code is 200, we should be good.
+    r_json = resp.json()
 
     return r_json
