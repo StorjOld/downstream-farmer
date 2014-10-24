@@ -404,7 +404,12 @@ class TestExceptions(unittest.TestCase):
         e = DownstreamError('Test Exception')
         self.assertEqual(str(e), 'Test Exception')
 
-
+class MockStateRestore(object):
+    def __init__(self, state):
+        self.state = state
+    
+    def __call__(self, dummy):
+        dummy.state = self.state
 
 class TestShell(unittest.TestCase):
     def setUp(self):
@@ -456,99 +461,91 @@ class TestShell(unittest.TestCase):
 
     def test_farmer_init_url(self):
         self.test_args.node_url = 'testurl'
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, self.test_args.node_url)
             self.assertEqual(farmer.state['last_url'], self.test_args.node_url)
 
     def test_farmer_init_url_from_state(self):
         self.test_args.node_url = None
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            farmer.state['last_url'] = 'stateurl'
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore({'last_url':'stateurl'})
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, 'stateurl')
             
     def test_farmer_init_url_default(self):
         self.test_args.node_url = None
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, 'http://verify.driveshare.org')
 
     def test_farmer_init_token(self):
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, self.test_args.token)
     
     def test_farmer_init_token_from_state(self):
         self.test_args.token = None
-        farmer = mock.MagicMock()
-        farmer.state = dict()
-        farmer.state['nodes'] = dict()
-        farmer.state['nodes'][self.test_args.node_url.strip('/')] = dict()
-        farmer.state['nodes'][self.test_args.node_url.strip('/')]['token'] = 'statetoken'
-        Farmer.__init__(farmer, self.test_args)
-        self.assertEqual(farmer.token, 'statetoken')
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore({'nodes':{self.test_args.node_url.strip('/'):{'token':'statetoken'}}})
+            farmer = Farmer(self.test_args)
+            self.assertEqual(farmer.token, 'statetoken')
             
     def test_farmer_init_token_default(self):
         self.test_args.token = None
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, None)
             
     def test_farmer_init_address(self):
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, self.test_args.address)
             
     def test_farmer_init_address_from_state(self):
         self.test_args.address = None
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            farmer.state['address'] = 'stateaddress'
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore({'address':'stateaddress'})
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, 'stateaddress')
             
     def test_farmer_init_address_default(self):
         self.test_args.address = None
-        with mock.patch('downstream_farmer.shell.Farmer.restore') as r,\
-                mock.patch('downstream_farmer.shell.Farmer.check_connectivity') as c:
-            farmer = mock.MagicMock()
-            farmer.state = dict()
-            Farmer.__init__(farmer, self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, None)
             
     def test_farmer_save_restore_state(self):
         d = {'key':'value'}
         path = 'test_file'
-        farmer = mock.MagicMock()
+        with mock.patch.object(Farmer,'__init__',autospec=True) as i:
+            i.return_value = None
+            farmer = Farmer(None)
         farmer.path = path
         farmer.state = d
-        Farmer.save(farmer)
-        Farmer.restore(farmer)
+        farmer.save()
+        farmer.restore()
         self.assertEqual(d, farmer.state)
         os.remove(path)
         
         #test path doesn't exist
         farmer.path = 'nonexistentpath'
-        Farmer.restore(farmer)
+        farmer.restore()
         self.assertEqual(farmer.state, dict())        
         
         # test directory creation
@@ -556,32 +553,36 @@ class TestShell(unittest.TestCase):
         path = os.path.join(dir,'file')
         farmer.path = path
         farmer.state = d
-        Farmer.save(farmer)
+        farmer.save()
         self.assertTrue(os.path.isdir(dir))
         self.assertTrue(os.path.exists(path))
-        Farmer.restore(farmer)
+        farmer.restore()
         self.assertEqual(d, farmer.state)
         os.remove(path)
         os.rmdir(dir)
         
     def test_farmer_check_connectivity(self):
-        farmer = mock.MagicMock()
-        farmer.url = 'testurl'
-        with mock.patch('downstream_farmer.shell.urlopen') as patch:
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch('downstream_farmer.shell.urlopen') as patch:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
             patch.side_effect = URLError('Problem')
             with self.assertRaises(DownstreamError) as ex:
-                Farmer.check_connectivity(farmer)
+                farmer.check_connectivity()
 
         with mock.patch('downstream_farmer.shell.urlopen') as patch:
-            Farmer.check_connectivity(farmer)
+            farmer.check_connectivity()
             self.assertTrue(patch.called)
     
     def test_farmer_run(self):
-        farmer = mock.MagicMock()
-        farmer.state = dict()
-        with mock.patch('downstream_farmer.shell.DownstreamClient') as patch:
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch('downstream_farmer.shell.urlopen') as patch:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
+        with mock.patch('downstream_farmer.shell.DownstreamClient') as patch,\
+                mock.patch.object(Farmer,'save',autospec=True):
             patch.return_value.token = 'foo'
-            Farmer.run(farmer)            
+            farmer.run()            
             patch.assert_called_with(farmer.url, farmer.token, farmer.address, farmer.size)
             self.assertTrue(patch.return_value.connect.called)
             self.assertEqual(farmer.state['nodes'][patch.return_value.server]['token'],
