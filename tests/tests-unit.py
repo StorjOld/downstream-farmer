@@ -176,7 +176,7 @@ class TestContract(unittest.TestCase):
             hpatch.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.contract.answer_challenge()
-            self.assertEqual(str(ex.exception),'Challenge answer failed.')
+            self.assertEqual(str(ex.exception),'Challenge answer failed: test error')
         
     def test_answer_malformed(self):
         self.client.heartbeat = self.heartbeat

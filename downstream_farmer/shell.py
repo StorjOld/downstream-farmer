@@ -41,8 +41,9 @@ class Farmer(object):
         5) if no address is specified on the command line, it will attempt to
            load the address for the node from disk
         6) if no address is available, fail.
-        7) if an address is given on the command line that is different from the
-           saved address, it uses the specified address and obtains a new token
+        7) if an address is given on the command line that is different from
+           the saved address, it uses the specified address and obtains a new
+           token
 
         :returns: a dictionary with the arguments
         """
@@ -80,13 +81,9 @@ class Farmer(object):
             self.token = self.state.get('nodes', dict()).\
                 get(self.url, dict()).get('token', None)
 
-        if (self.token is not None):
-            print('Using token {0}'.format(self.token))
-
-
         saved_address = self.state.get('nodes', dict()).\
-                get(self.url, dict()).get('address', None)
-            
+            get(self.url, dict()).get('address', None)
+
         if (args.address is not None):
             self.address = args.address
             if (saved_address is not None and self.address != saved_address):
@@ -98,6 +95,12 @@ class Farmer(object):
         if (self.token is None and self.address is None):
             raise DownstreamError(
                 'Must specify farming address if one is not available.')
+
+        if (self.token is not None):
+            print('Using token {0}'.format(self.token))
+
+        if (self.address is not None):
+            print('Farming on address {0}'.format(self.address))
 
     def save(self):
         """saves the farmer state to disk
@@ -134,9 +137,9 @@ class Farmer(object):
 
         # connection successful, save our state, then begin farming
         self.state.setdefault('nodes', dict())[client.server] = {
-                'token': client.token,
-                'address': client.address
-            }
+            'token': client.token,
+            'address': client.address
+        }
 
         self.save()
 

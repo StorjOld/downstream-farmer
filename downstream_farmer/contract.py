@@ -110,8 +110,9 @@ class DownstreamContract(object):
 
         try:
             r_json = handle_json_response(resp)
-        except DownstreamError:
-            raise DownstreamError('Challenge answer failed.')
+        except DownstreamError as ex:
+            raise DownstreamError(
+                'Challenge answer failed: {0}'.format(str(ex)))
 
         if ('status' not in r_json):
             raise DownstreamError('Malformed response from server.')
