@@ -39,8 +39,10 @@ class Farmer(object):
         4) if no token is on disk, it will attempt to retrieve a new farming
            token from the node.  this requires an address.
         5) if no address is specified on the command line, it will attempt to
-           load the address from disk.
+           load the address for the node from disk
         6) if no address is available, fail.
+        7) if an address is given on the command line that is different from the
+           saved address, it uses the specified address and obtains a new token
 
         :returns: a dictionary with the arguments
         """
@@ -81,16 +83,21 @@ class Farmer(object):
         if (self.token is not None):
             print('Using token {0}'.format(self.token))
 
+
+        saved_address = self.state.get('nodes', dict()).\
+                get(self.url, dict()).get('address', None)
+            
         if (args.address is not None):
             self.address = args.address
+            if (saved_address is not None and self.address != saved_address):
+                print('New address specified, obtaining new token.')
+                self.token = None
         else:
-            self.address = self.state.get('address', None)
+            self.address = saved_address
 
         if (self.token is None and self.address is None):
             raise DownstreamError(
                 'Must specify farming address if one is not available.')
-
-        self.state['address'] = self.address
 
     def save(self):
         """saves the farmer state to disk
@@ -126,8 +133,10 @@ class Farmer(object):
         client.connect()
 
         # connection successful, save our state, then begin farming
-        self.state.setdefault('nodes', dict()).\
-            setdefault(client.server, dict())['token'] = client.token
+        self.state.setdefault('nodes', dict())[client.server] = {
+                'token': client.token,
+                'address': client.address
+            }
 
         self.save()
 

@@ -495,7 +495,15 @@ class TestShell(unittest.TestCase):
         self.test_args.token = None
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore({'nodes':{self.test_args.node_url.strip('/'):{'token':'statetoken'}}})
+            r.side_effect = MockStateRestore(
+                {
+                    'nodes':{
+                        self.test_args.node_url.strip('/'):{
+                            'token': 'statetoken',
+                            'address': 'testaddress'
+                        }
+                    }
+                })
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, 'statetoken')
             
@@ -518,7 +526,15 @@ class TestShell(unittest.TestCase):
         self.test_args.address = None
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore({'address':'stateaddress'})
+            r.side_effect = MockStateRestore(
+                {
+                    'nodes':{
+                        self.test_args.node_url.strip('/'):{
+                            'token': 'statetoken',
+                            'address': 'stateaddress'
+                        }
+                    }
+                })
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, 'stateaddress')
             
