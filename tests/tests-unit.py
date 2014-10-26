@@ -176,7 +176,7 @@ class TestContract(unittest.TestCase):
             hpatch.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.contract.answer_challenge()
-            self.assertEqual(str(ex.exception),'Challenge answer failed.')
+            self.assertEqual(str(ex.exception),'Challenge answer failed: test error')
         
     def test_answer_malformed(self):
         self.client.heartbeat = self.heartbeat
@@ -482,7 +482,7 @@ class TestShell(unittest.TestCase):
                 mock.patch.object(Farmer,'check_connectivity') as c:
             r.side_effect = MockStateRestore(dict())
             farmer = Farmer(self.test_args)
-            self.assertEqual(farmer.url, 'http://verify.driveshare.org')
+            self.assertEqual(farmer.url, 'http://verify.driveshare.org:8000')
 
     def test_farmer_init_token(self):
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
@@ -495,7 +495,15 @@ class TestShell(unittest.TestCase):
         self.test_args.token = None
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore({'nodes':{self.test_args.node_url.strip('/'):{'token':'statetoken'}}})
+            r.side_effect = MockStateRestore(
+                {
+                    'nodes':{
+                        self.test_args.node_url.strip('/'):{
+                            'token': 'statetoken',
+                            'address': 'testaddress'
+                        }
+                    }
+                })
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, 'statetoken')
             
@@ -518,7 +526,15 @@ class TestShell(unittest.TestCase):
         self.test_args.address = None
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore({'address':'stateaddress'})
+            r.side_effect = MockStateRestore(
+                {
+                    'nodes':{
+                        self.test_args.node_url.strip('/'):{
+                            'token': 'statetoken',
+                            'address': 'stateaddress'
+                        }
+                    }
+                })
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, 'stateaddress')
             

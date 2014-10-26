@@ -3,6 +3,8 @@
 from __future__ import print_function
 
 import time
+import binascii
+import hashlib
 
 import requests
 import heartbeat
@@ -61,7 +63,10 @@ class DownstreamClient(object):
         self.heartbeat \
             = heartbeat_types[r_json['type']].fromdict(r_json['heartbeat'])
 
-        print('Retrieved client token {0}'.format(self.token))
+        # we can calculate farmer id for display...
+        token = binascii.unhexlify(self.token)
+        token_hash = hashlib.sha256(token).hexdigest()[:20]
+        print('Farmer id: {0}'.format(token_hash))
 
     def get_chunk(self, size=None):
         """Gets a chunk contract from the connected node
@@ -165,9 +170,9 @@ class DownstreamClient(object):
             print('Answering challenge.')
             try:
                 next_contract.answer_challenge()
-            except DownstreamError:
+            except DownstreamError as ex:
                 # challenge answer failed, remove this contract
-                print('Challenge answer failed, dropping contract {0}'.
-                      format(next_contract.hash))
+                print('Challenge answer failed: {0}, dropping contract {1}'.
+                      format(str(ex), next_contract.hash))
                 self.contracts.remove(next_contract)
                 continue
