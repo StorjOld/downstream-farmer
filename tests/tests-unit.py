@@ -482,7 +482,7 @@ class TestShell(unittest.TestCase):
                 mock.patch.object(Farmer,'check_connectivity') as c:
             r.side_effect = MockStateRestore(dict())
             farmer = Farmer(self.test_args)
-            self.assertEqual(farmer.url, 'http://verify.driveshare.org')
+            self.assertEqual(farmer.url, 'http://verify.driveshare.org:8000')
 
     def test_farmer_init_token(self):
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
