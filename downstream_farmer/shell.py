@@ -12,8 +12,6 @@ from .client import DownstreamClient
 from .version import __version__
 from .exc import DownstreamError
 
-#from six.moves.urllib.request import urlopen
-#from six.moves.urllib.error import URLError
 import six
 
 
