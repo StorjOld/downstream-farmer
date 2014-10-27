@@ -1,5 +1,5 @@
 from setuptools import setup
-import py2exe
+#import py2exe
 
 with open('downstream_farmer/version.py','r') as f:
     exec(f.read())
@@ -24,6 +24,6 @@ setup(
         'console_scripts': [
             'downstream = downstream_farmer.shell:main'
         ]
-    },
-    console=['ds.py']
+    } # ,
+#    console=['ds.py']
 )
