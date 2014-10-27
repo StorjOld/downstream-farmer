@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-from six.moves.urllib.parse import quote
+import six
 
 from .exc import DownstreamError
 
@@ -19,7 +19,7 @@ def urlify(string):
     :param string: String to URLify
     :return: URLified string
     """
-    return quote(string)
+    return six.moves.urllib.parse.quote(string)
 
 
 def handle_json_response(resp):

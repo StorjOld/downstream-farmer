@@ -8,6 +8,7 @@ import binascii
 from argparse import Namespace
 import json
 
+import six
 from six.moves.urllib.error import URLError
 
 import mock
@@ -579,20 +580,20 @@ class TestShell(unittest.TestCase):
         
     def test_farmer_check_connectivity(self):
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
-                mock.patch('downstream_farmer.shell.urlopen') as patch:
+                mock.patch('six.moves.urllib.request.urlopen') as patch:
             r.side_effect = MockStateRestore(dict())
             farmer = Farmer(self.test_args)
             patch.side_effect = URLError('Problem')
             with self.assertRaises(DownstreamError) as ex:
                 farmer.check_connectivity()
 
-        with mock.patch('downstream_farmer.shell.urlopen') as patch:
+        with mock.patch('six.moves.urllib.request.urlopen') as patch:
             farmer.check_connectivity()
             self.assertTrue(patch.called)
     
     def test_farmer_run(self):
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
-                mock.patch('downstream_farmer.shell.urlopen') as patch:
+                mock.patch('six.moves.urllib.request.urlopen') as patch:
             r.side_effect = MockStateRestore(dict())
             farmer = Farmer(self.test_args)
         with mock.patch('downstream_farmer.shell.DownstreamClient') as patch,\

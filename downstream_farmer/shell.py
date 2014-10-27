@@ -9,11 +9,12 @@ import json
 import signal
 
 from .client import DownstreamClient
-from downstream_farmer.version import __version__
-from downstream_farmer.exc import DownstreamError
+from .version import __version__
+from .exc import DownstreamError
 
-from six.moves.urllib.request import urlopen
-from six.moves.urllib.error import URLError
+#from six.moves.urllib.request import urlopen
+#from six.moves.urllib.error import URLError
+import six
 
 
 def fail_exit(msg, exit_code=1):
@@ -126,8 +127,8 @@ class Farmer(object):
         https://stackoverflow.com/questions/3764291/checking-network-connection
         """
         try:
-            urlopen(self.url, timeout=2)
-        except URLError:
+            six.moves.urllib.request.urlopen(self.url, timeout=2)
+        except six.moves.urllib.error.URLError:
             raise DownstreamError("Could not connect to server.")
 
     def run(self):

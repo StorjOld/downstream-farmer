@@ -18,7 +18,7 @@ $ pip install -r requirements.txt .
 
 And connect to our test node by running:
 ```
-$ downstream 'http://verify.driveshare.org'
+$ downstream 'http://verify.driveshare.org:8000'
 ```
 
 This prototype performs three simple functions.  It connects to the specified downstream-node, it requests a chunk (which also gives it the first chunk challenge), and then it answers the chunk challenge.
@@ -28,7 +28,7 @@ This prototype performs three simple functions.  It connects to the specified do
 
 ## Client Functions
 Connects to a downstream compatible node. Should also generate a new account token and retrieves the heartbeat for the proof of storage.
-    
+
     connect(url)
 
 Queries the server for a file chunk, which in this prototype is simply a file seed for RandomIO to generate.
