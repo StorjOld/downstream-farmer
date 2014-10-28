@@ -2,7 +2,7 @@ import io
 import json
 import time
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from RandomIO import RandomIO
 
@@ -78,7 +78,8 @@ class DownstreamContract(object):
 
         self.challenge = self.client.heartbeat.challenge_type().\
             fromdict(r_json['challenge'])
-        self.expiration = datetime.strptime(r_json['due'], '%Y-%m-%dT%H:%M:%S')
+        self.expiration = datetime.utcnow()\
+            + timedelta(seconds=int(r_json['due']))
         self.answered = r_json['answered']
 
     def answer_challenge(self):

@@ -86,7 +86,7 @@ class Farmer(object):
 
         if (args.address is not None):
             self.address = args.address
-            if (saved_address is not None and self.address != saved_address):
+            if (self.address != saved_address):
                 print('New address specified, obtaining new token.')
                 self.token = None
         else:

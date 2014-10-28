@@ -8,13 +8,13 @@ import hashlib
 
 import requests
 import heartbeat
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .utils import handle_json_response
 from .exc import DownstreamError
 from .contract import DownstreamContract
 
-heartbeat_types = {'SwPriv': heartbeat.SwPriv.SwPriv,
+heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
                    'Merkle': heartbeat.Merkle.Merkle}
 
 
@@ -94,7 +94,7 @@ class DownstreamClient(object):
             r_json['seed'],
             r_json['size'],
             self.heartbeat.challenge_type().fromdict(r_json['challenge']),
-            datetime.strptime(r_json['due'], '%Y-%m-%dT%H:%M:%S'),
+            datetime.utcnow()+timedelta(seconds=int(r_json['due'])),
             self.heartbeat.tag_type().fromdict(r_json['tag']))
 
         self.contracts.append(contract)
