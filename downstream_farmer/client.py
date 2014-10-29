@@ -66,7 +66,7 @@ class DownstreamClient(object):
         # we can calculate farmer id for display...
         token = binascii.unhexlify(self.token)
         token_hash = hashlib.sha256(token).hexdigest()[:20]
-        print('Obtained token: {0}'.format(self.token))
+        print('Confirmed token: {0}'.format(self.token))
         print('Farmer id: {0}'.format(token_hash))
 
     def get_chunk(self, size=None):
@@ -139,10 +139,11 @@ class DownstreamClient(object):
                     size_to_fill = self.desired_size - self.get_total_size()
                     print('{0} bytes remaining'.format(size_to_fill))
                     self.get_chunk(size_to_fill)
-            except DownstreamError:
+            except DownstreamError as ex:
                 # probably no more contracts. if we don't have any, raise error
                 if (len(self.contracts) == 0):
-                    raise DownstreamError('Unable to obtain a contract.')
+                    raise DownstreamError('Unable to obtain a contract: {0}'.\
+                        format(str(ex)))
                 # otherwise, continue, since he have one
 
             # get the next expiring contract
@@ -152,9 +153,9 @@ class DownstreamClient(object):
             time_to_wait = next_contract.time_remaining()
 
             if (time_to_wait > 0):
-                # add a second for rounding errors
-                print('Sleeping {0}'.format(time_to_wait+1))
-                time.sleep(time_to_wait+1)
+                # add 2 seconds for rounding errors in the timing
+                print('Sleeping {0}'.format(time_to_wait+2))
+                time.sleep(time_to_wait+2)
 
             # update the challenge.  don't block if for any reason
             # we would (which we shouldn't anyway)
