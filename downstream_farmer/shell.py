@@ -169,7 +169,7 @@ def eval_args(args):
 
 
 def parse_args():
-    default_path = os.path.join('data','state.json')
+    default_path = os.path.join('data', 'state.json')
     default_size = 100
     parser = argparse.ArgumentParser('downstream')
     parser.add_argument('-V', '--version', action='version',
