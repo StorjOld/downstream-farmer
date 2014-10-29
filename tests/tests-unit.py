@@ -53,7 +53,7 @@ class TestContract(unittest.TestCase):
             fromdict(MockValues.get_challenge_response['challenge'])
         self.heartbeat = Heartbeat.fromdict(MockValues.connect_response['heartbeat'])
         self.tag = Heartbeat.tag_type().fromdict(MockValues.get_chunk_response['tag'])
-        self.expiration = datetime.utcnow()+timedelta(seconds=60)
+        self.expiration = datetime.utcnow()+timedelta(int(MockValues.get_chunk_response['due']))
         self.client = mock.MagicMock()
         self.contract = DownstreamContract(self.client,
                                            'hash',
@@ -153,10 +153,8 @@ class TestContract(unittest.TestCase):
             self.assertEqual(self.contract.challenge, 
                              Heartbeat.challenge_type().fromdict(
                                 MockValues.get_challenge_response['challenge']))
-            self.assertEqual(self.contract.expiration,
-                             datetime.strptime(
-                                MockValues.get_challenge_response['due'],
-                                '%Y-%m-%dT%H:%M:%S'))
+            self.assertAlmostEqual((self.contract.expiration-datetime.utcnow()).total_seconds(),
+                                    int(MockValues.get_challenge_response['due']),delta=0.5)
             
     def test_answer_challenge_answered(self):
         self.contract.answered = True
@@ -221,9 +219,8 @@ class TestClient(unittest.TestCase):
             MockValues.get_chunk_response['size'],
             Heartbeat.challenge_type().fromdict(
                 MockValues.get_chunk_response['challenge']),
-            datetime.strptime(
-                MockValues.get_chunk_response['due'],
-                '%Y-%m-%dT%H:%M:%S'),
+            datetime.utcnow()+timedelta(seconds=
+                int(MockValues.get_chunk_response['due'])),
             Heartbeat.tag_type().fromdict(
                 MockValues.get_chunk_response['tag']))
         self.test_heartbeat = Heartbeat.fromdict(MockValues.connect_response['heartbeat'])
@@ -252,7 +249,7 @@ class TestClient(unittest.TestCase):
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.client.connect()
-            self.assertEqual(str(ex.exception),'Unable to connect.  Error: test error')
+            self.assertEqual(str(ex.exception),'Unable to connect: test error')
     
     def test_connect_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -298,7 +295,7 @@ class TestClient(unittest.TestCase):
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.client.get_chunk()
-            self.assertEqual(str(ex.exception),'Unable to get token. Error: test error')
+            self.assertEqual(str(ex.exception),'Unable to get token: test error')
                          
     def test_get_chunk_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -317,7 +314,7 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.contracts[0].seed, self.test_contract.seed)
         self.assertEqual(self.client.contracts[0].size, self.test_contract.size)
         self.assertEqual(self.client.contracts[0].challenge, self.test_contract.challenge)
-        self.assertEqual(self.client.contracts[0].expiration, self.test_contract.expiration)
+        self.assertAlmostEqual((self.client.contracts[0].expiration - self.test_contract.expiration).total_seconds(), 0, delta=1)
         self.assertEqual(self.client.contracts[0].tag, self.test_contract.tag)
 
     def test_get_total_size(self):
@@ -425,6 +422,7 @@ class TestShell(unittest.TestCase):
         self.test_args.address = 'testaddress'
         self.test_args.size = 100
         self.test_args.path = 'statefile'
+        self.test_args.forcenew = False
 
     def tearDown(self):
         sys.argv = self._old_argv
@@ -486,6 +484,7 @@ class TestShell(unittest.TestCase):
             self.assertEqual(farmer.url, 'http://verify.driveshare.org:8000')
 
     def test_farmer_init_token(self):
+        self.test_args.address = None
         with mock.patch.object(Farmer,'restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
             r.side_effect = MockStateRestore(dict())
@@ -658,7 +657,7 @@ class TestShell(unittest.TestCase):
     
     def test_parse_args_path_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.path, os.path.join('data','state'))
+        self.assertEqual(args.path, os.path.join('data','state.json'))
         
     def test_parse_args_size(self):        
         sys.argv.append('--size')
@@ -713,7 +712,7 @@ class MockValues:
                      "sY8Pad8UemCLvLGNlnkavsbn0dXk7/0QL5KYGardu9m5zWtQEagdvl86"
                      "tSbksec1B5Y9K1S5hGlr",
         "token": "b45a3e2932c87474cb1bd7e642cf792b",
-        "type": "SwPriv"
+        "type": "Swizzle"
     }
 
     get_chunk_response = {
@@ -722,7 +721,7 @@ class MockValues:
                      "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
                      "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
                      "uYRpaw==",
-        "due": "2014-10-06T11:49:57",
+        "due": "60",
         "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
                      "91ce7732",
         "seed": "eb1bb0f7cd24720d456193cca8c42edb",
@@ -738,6 +737,6 @@ class MockValues:
                      "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
                      "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
                      "FU58Vw==",
-        "due": "2014-10-09T14:57:11",
+        "due": "60",
         "answered": True
     }

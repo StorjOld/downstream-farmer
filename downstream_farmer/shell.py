@@ -75,18 +75,26 @@ class Farmer(object):
 
         self.state['last_url'] = self.url
 
+        saved_token = self.state.get('nodes', dict()).\
+            get(self.url, dict()).get('token', None)
+
         if (args.token is not None):
             self.token = args.token
         else:
-            self.token = self.state.get('nodes', dict()).\
-                get(self.url, dict()).get('token', None)
+            self.token = saved_token
+
+        if (args.forcenew):
+            if (self.token is not None):
+                print('Not using token {0} since '
+                      'forcenew was specified.'.format(self.token))
+                self.token = None
 
         saved_address = self.state.get('nodes', dict()).\
             get(self.url, dict()).get('address', None)
 
         if (args.address is not None):
             self.address = args.address
-            if (saved_address is not None and self.address != saved_address):
+            if (self.address != saved_address):
                 print('New address specified, obtaining new token.')
                 self.token = None
         else:
@@ -161,21 +169,39 @@ def eval_args(args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser('downstream-farmer')
+    default_path = os.path.join('data', 'state.json')
+    default_size = 100
+    parser = argparse.ArgumentParser('downstream')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node_url', nargs='?',
-                        help='URL of the Downstream node')
+                        help='URL of the downstream node to connect to')
     parser.add_argument('-n', '--number', type=int,
-                        help='Number of challenges to perform.'
+                        help='Number of challenges to perform. '
                         'If unspecified, perform challenges until killed.')
     parser.add_argument('-p', '--path',
-                        default=os.path.join('data', 'state'),
-                        help='Path to save/load state from.')
-    parser.add_argument('-s', '--size', type=int, default=100,
-                        help='Total size of contracts to obtain.')
-    parser.add_argument('-a', '--address', help='SJCX address')
-    parser.add_argument('-t', '--token', help='Farming token')
+                        default=default_path,
+                        help='Path to save/load state from.  The state file '
+                        'saves your last connected node, your farming tokens, '
+                        'your SJCX address, and other data.  The default is '
+                        '{0}'.format(default_path))
+    parser.add_argument('-s', '--size', type=int, default=default_size,
+                        help='Total size of contracts to obtain in bytes. '
+                        'Default is {0} bytes'.format(default_size))
+    parser.add_argument('-a', '--address', help='SJCX address for farming. You'
+                        ' only need to specify this the first time you connect'
+                        ' after that, your address is saved by the node under '
+                        'your farming token')
+    parser.add_argument('-t', '--token', help='Farming token to use.  If you '
+                        'already have a farming token, you can reconnect to '
+                        'the node with it by specifying it here.  By default '
+                        'a new token will be obtained if you specify an SJCX '
+                        'address to use.')
+    parser.add_argument('-f', '--forcenew', help='Force obtaining a new token.'
+                        ' If the node has been reset and your token has been '
+                        'deleted, it may be necessary to force your farmer to '
+                        'obtain a new token.',
+                        action='store_true')
     return parser.parse_args()
 
 

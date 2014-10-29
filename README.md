@@ -18,24 +18,47 @@ $ pip install -r requirements.txt .
 
 And connect to our test node by running:
 ```
-$ downstream 'http://verify.driveshare.org:8000'
+$ downstream
 ```
 
-This prototype performs three simple functions.  It connects to the specified downstream-node, it requests a chunk (which also gives it the first chunk challenge), and then it answers the chunk challenge.
+The usage of the program is:
+
+```
+usage: downstream [-h] [-V] [-n NUMBER] [-p PATH] [-s SIZE] [-a ADDRESS]
+                  [-t TOKEN] [-f]
+                  [node_url]
+
+positional arguments:
+  node_url              URL of the downstream node to connect to
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -V, --version         show program's version number and exit
+  -n NUMBER, --number NUMBER
+                        Number of challenges to perform. If unspecified,
+                        perform challenges until killed.
+  -p PATH, --path PATH  Path to save/load state from. The state file saves
+                        your last connected node, your farming tokens, your
+                        SJCX address, and other data. The default is
+                        data\state.json
+  -s SIZE, --size SIZE  Total size of contracts to obtain in bytes. Default is
+                        100 bytes
+  -a ADDRESS, --address ADDRESS
+                        SJCX address for farming. You only need to specify
+                        this the first time you connect after that, your
+                        address is saved by the node under your farming token
+  -t TOKEN, --token TOKEN
+                        Farming token to use. If you already have a farming
+                        token, you can reconnect to the node with it by
+                        specifying it here. By default a new token will be
+                        obtained if you specify an SJCX address to use.
+  -f, --forcenew        Force obtaining a new token. If the node has been
+                        reset and your token has been deleted, it may be
+                        necessary to force your farmer to obtain a new token.
+```
+
+This prototype performs three simple functions.  It connects to the specified node, it requests a chunk (which also gives it the first chunk challenge and information to recreate the test file), and then it answers the chunk challenge.
 
 **If this is at all confusing, we're doing it as a functional test in the travis.yml file, so watch it in action on Travis-CI.**
 
-
-## Client Functions
-Connects to a downstream compatible node. Should also generate a new account token and retrieves the heartbeat for the proof of storage.
-
-    connect(url)
-
-Queries the server for a file chunk, which in this prototype is simply a file seed for RandomIO to generate.
-
-    get_chunk()
-
-Answers the chunk contract that was retrieved with get_chunk().
-
-    answer_challenge()
 
