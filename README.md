@@ -23,9 +23,9 @@ $ downstream
 
 The usage is
 ```
-usage: downstream-farmer [-h] [-V] [-n NUMBER] [-p PATH] [-s SIZE]
-                         [-a ADDRESS] [-t TOKEN] [-f]
-                         [node_url]
+usage: downstream [-h] [-V] [-n NUMBER] [-p PATH] [-s SIZE] [-a ADDRESS]
+				  [-t TOKEN] [-f]
+                  [node_url]
 
 positional arguments:
   node_url              URL of the Downstream node

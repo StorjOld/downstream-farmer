@@ -169,7 +169,7 @@ def eval_args(args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser('downstream-farmer')
+    parser = argparse.ArgumentParser('downstream')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node_url', nargs='?',
