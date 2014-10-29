@@ -75,11 +75,19 @@ class Farmer(object):
 
         self.state['last_url'] = self.url
 
+        saved_token = self.state.get('nodes', dict()).\
+            get(self.url, dict()).get('token', None)
+
         if (args.token is not None):
             self.token = args.token
         else:
-            self.token = self.state.get('nodes', dict()).\
-                get(self.url, dict()).get('token', None)
+            self.token = saved_token
+
+        if (args.forcenew):
+            if (self.token is not None):
+                print('Not using token {0} since '
+                      'forcenew was specified.'.format(self.token))
+                self.token = None
 
         saved_address = self.state.get('nodes', dict()).\
             get(self.url, dict()).get('address', None)
@@ -176,6 +184,8 @@ def parse_args():
                         help='Total size of contracts to obtain.')
     parser.add_argument('-a', '--address', help='SJCX address')
     parser.add_argument('-t', '--token', help='Farming token')
+    parser.add_argument('-f', '--forcenew', help='Force obtaining a new token',
+                        action='store_true')
     return parser.parse_args()
 
 

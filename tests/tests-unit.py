@@ -422,6 +422,7 @@ class TestShell(unittest.TestCase):
         self.test_args.address = 'testaddress'
         self.test_args.size = 100
         self.test_args.path = 'statefile'
+        self.test_args.forcenew = False
 
     def tearDown(self):
         sys.argv = self._old_argv

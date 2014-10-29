@@ -94,7 +94,7 @@ class DownstreamClient(object):
             r_json['seed'],
             r_json['size'],
             self.heartbeat.challenge_type().fromdict(r_json['challenge']),
-            datetime.utcnow()+timedelta(seconds=int(r_json['due'])),
+            datetime.utcnow() + timedelta(seconds=int(r_json['due'])),
             self.heartbeat.tag_type().fromdict(r_json['tag']))
 
         self.contracts.append(contract)
