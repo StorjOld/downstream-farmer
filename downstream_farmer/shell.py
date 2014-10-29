@@ -169,22 +169,38 @@ def eval_args(args):
 
 
 def parse_args():
+    default_path = os.path.join('data','state.json')
+    default_size = 100
     parser = argparse.ArgumentParser('downstream')
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node_url', nargs='?',
-                        help='URL of the Downstream node')
+                        help='URL of the downstream node to connect to')
     parser.add_argument('-n', '--number', type=int,
-                        help='Number of challenges to perform.'
+                        help='Number of challenges to perform. '
                         'If unspecified, perform challenges until killed.')
     parser.add_argument('-p', '--path',
-                        default=os.path.join('data', 'state'),
-                        help='Path to save/load state from.')
-    parser.add_argument('-s', '--size', type=int, default=100,
-                        help='Total size of contracts to obtain.')
-    parser.add_argument('-a', '--address', help='SJCX address')
-    parser.add_argument('-t', '--token', help='Farming token')
-    parser.add_argument('-f', '--forcenew', help='Force obtaining a new token',
+                        default=default_path,
+                        help='Path to save/load state from.  The state file '
+                        'saves your last connected node, your farming tokens, '
+                        'your SJCX address, and other data.  The default is '
+                        '{0}'.format(default_path))
+    parser.add_argument('-s', '--size', type=int, default=default_size,
+                        help='Total size of contracts to obtain in bytes. '
+                        'Default is {0} bytes'.format(default_size))
+    parser.add_argument('-a', '--address', help='SJCX address for farming. You'
+                        ' only need to specify this the first time you connect'
+                        ' after that, your address is saved by the node under '
+                        'your farming token')
+    parser.add_argument('-t', '--token', help='Farming token to use.  If you '
+                        'already have a farming token, you can reconnect to '
+                        'the node with it by specifying it here.  By default '
+                        'a new token will be obtained if you specify an SJCX '
+                        'address to use.')
+    parser.add_argument('-f', '--forcenew', help='Force obtaining a new token.'
+                        ' If the node has been reset and your token has been '
+                        'deleted, it may be necessary to force your farmer to '
+                        'obtain a new token.',
                         action='store_true')
     return parser.parse_args()
 
