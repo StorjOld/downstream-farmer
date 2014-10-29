@@ -657,7 +657,7 @@ class TestShell(unittest.TestCase):
     
     def test_parse_args_path_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.path, os.path.join('data','state'))
+        self.assertEqual(args.path, os.path.join('data','state.json'))
         
     def test_parse_args_size(self):        
         sys.argv.append('--size')
