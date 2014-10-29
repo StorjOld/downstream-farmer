@@ -142,8 +142,8 @@ class DownstreamClient(object):
             except DownstreamError as ex:
                 # probably no more contracts. if we don't have any, raise error
                 if (len(self.contracts) == 0):
-                    raise DownstreamError('Unable to obtain a contract: {0}'.\
-                        format(str(ex)))
+                    raise DownstreamError('Unable to obtain a contract: {0}'.
+                                          format(str(ex)))
                 # otherwise, continue, since he have one
 
             # get the next expiring contract
@@ -154,8 +154,8 @@ class DownstreamClient(object):
 
             if (time_to_wait > 0):
                 # add 2 seconds for rounding errors in the timing
-                print('Sleeping {0}'.format(time_to_wait+2))
-                time.sleep(time_to_wait+2)
+                print('Sleeping {0}'.format(time_to_wait + 2))
+                time.sleep(time_to_wait + 2)
 
             # update the challenge.  don't block if for any reason
             # we would (which we shouldn't anyway)

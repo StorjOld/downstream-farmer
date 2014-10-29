@@ -346,7 +346,7 @@ class TestClient(unittest.TestCase):
         client.contracts = []
         with self.assertRaises(DownstreamError) as ex:
             DownstreamClient.run(client, 1)
-        self.assertEqual(str(ex.exception), 'Unable to obtain a contract.')
+        self.assertEqual(str(ex.exception), 'Unable to obtain a contract: test error')
         
     def test_run_working(self):
         client = mock.MagicMock(spec=DownstreamClient)
