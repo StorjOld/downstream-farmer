@@ -49,7 +49,7 @@ class DownstreamClient(object):
             r_json = handle_json_response(resp)
         except DownstreamError as ex:
             # can't handle a connect error.  fail.
-            raise DownstreamError('Unable to connect.  Error: {0}'.
+            raise DownstreamError('Unable to connect: {0}'.
                                   format(str(ex)))
 
         for k in ['token', 'heartbeat', 'type']:
@@ -66,6 +66,7 @@ class DownstreamClient(object):
         # we can calculate farmer id for display...
         token = binascii.unhexlify(self.token)
         token_hash = hashlib.sha256(token).hexdigest()[:20]
+        print('Obtained token: {0}'.format(self.token))
         print('Farmer id: {0}'.format(token_hash))
 
     def get_chunk(self, size=None):
@@ -81,7 +82,7 @@ class DownstreamClient(object):
             r_json = handle_json_response(resp)
         except DownstreamError as ex:
             # can't handle an invalid token
-            raise DownstreamError('Unable to get token. Error: {0}'.
+            raise DownstreamError('Unable to get token: {0}'.
                                   format(str(ex)))
 
         for k in ['file_hash', 'seed', 'size', 'challenge', 'tag', 'due']:

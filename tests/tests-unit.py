@@ -249,7 +249,7 @@ class TestClient(unittest.TestCase):
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.client.connect()
-            self.assertEqual(str(ex.exception),'Unable to connect.  Error: test error')
+            self.assertEqual(str(ex.exception),'Unable to connect: test error')
     
     def test_connect_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -295,7 +295,7 @@ class TestClient(unittest.TestCase):
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
                 self.client.get_chunk()
-            self.assertEqual(str(ex.exception),'Unable to get token. Error: test error')
+            self.assertEqual(str(ex.exception),'Unable to get token: test error')
                          
     def test_get_chunk_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
