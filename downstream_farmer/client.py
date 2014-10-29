@@ -152,8 +152,9 @@ class DownstreamClient(object):
             time_to_wait = next_contract.time_remaining()
 
             if (time_to_wait > 0):
-                print('Sleeping {0}'.format(time_to_wait))
-                time.sleep(time_to_wait)
+                # add a second for rounding errors
+                print('Sleeping {0}'.format(time_to_wait+1))
+                time.sleep(time_to_wait+1)
 
             # update the challenge.  don't block if for any reason
             # we would (which we shouldn't anyway)

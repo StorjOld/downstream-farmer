@@ -18,7 +18,7 @@ $ pip install -r requirements.txt .
 
 And connect to our test node by running:
 ```
-$ downstream
+$ downstream -a YOUR_SJCX_ADDRESS
 ```
 
 The usage of the program is:
