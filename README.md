@@ -13,7 +13,7 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 $ sudo apt-get install python-dev libcrypto++-dev git python-pip
 $ git clone -b devel https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
-$ pip install -r requirements.txt
+$ pip install -r requirements.txt .
 ```
 
 And connect to our test node by running:
