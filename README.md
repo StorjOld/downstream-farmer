@@ -5,7 +5,7 @@ Master: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branc
 Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch=devel)](https://travis-ci.org/Storj/downstream-farmer) [![Coverage Status](https://img.shields.io/coveralls/Storj/downstream-farmer.svg)](https://coveralls.io/r/Storj/downstream-farmer?branch=devel)
 
 
-## What is this I don't even?
+## What is this?
 
 `downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, will require python-dev and libcrypto++-dev to install from source.
 
@@ -13,7 +13,7 @@ Devel: [![Build Status](https://travis-ci.org/Storj/downstream-farmer.svg?branch
 $ sudo apt-get install python-dev libcrypto++-dev git python-pip
 $ git clone -b devel https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
-$ pip install -r requirements.txt .
+$ pip install -r requirements.txt
 ```
 
 And connect to our test node by running:
