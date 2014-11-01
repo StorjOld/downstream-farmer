@@ -365,7 +365,28 @@ class TestClient(unittest.TestCase):
         DownstreamClient.run(client, 1)
         self.assertEqual(client.get_chunk.call_count, 1)
         self.assertEqual(contract.update_challenge.call_count, 1)
-        self.assertEqual(contract.answer_challenge.call_count, 1)       
+        self.assertEqual(contract.answer_challenge.call_count, 1)
+    
+    def test_run_working_block(self):
+        client = mock.MagicMock(spec=DownstreamClient)
+        client.get_total_size.return_value = 0
+        client.desired_size = 100
+        contract = mock.MagicMock(spec=DownstreamContract)
+        contract.time_remaining.return_value = 1
+        contract.hash = '1'
+        
+        def patch_get_chunk(size):
+            client.get_total_size.return_value = client.get_total_size.return_value + size
+            client.contracts = [contract]
+        
+        client.get_chunk.side_effect = patch_get_chunk
+        client.get_next_contract.return_value = contract
+        with mock.patch('time.sleep') as a:
+            DownstreamClient.run(client, 1)
+        self.assertEqual(client.get_chunk.call_count, 1)
+        self.assertEqual(contract.update_challenge.call_count, 1)
+        self.assertEqual(contract.answer_challenge.call_count, 1)
+        self.assertEqual(a.call_count, 1)
         
     def test_run_update_failed(self):
         client = mock.MagicMock(spec=DownstreamClient)
@@ -446,16 +467,23 @@ class TestShell(unittest.TestCase):
         with self.assertRaises(DownstreamError) as ex:
             farmer = Farmer(self.test_args)
         self.assertEqual(str(ex.exception), 'Must specify a positive size to farm.')
+        
+    def test_farmer_init_forcenew(self):
+        self.test_args.forcenew = True
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:
+            r.side_effect = MockStateRestore(dict())
+            farmer = Farmer(self.test_args)
+        self.assertIsNone(farmer.token)
     
     def test_farmer_init_no_token_no_address(self):
         self.test_args.token = None
         self.test_args.address = None
-        farmer = mock.MagicMock(spec=Farmer)
-        farmer.state = dict()
-        farmer.token = None
-        farmer.address = None
-        with self.assertRaises(DownstreamError) as ex:
-            Farmer.__init__(farmer,self.test_args)
+        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c,\
+                self.assertRaises(DownstreamError) as ex:
+            r.side_effect = MockStateRestore(dict())
+            Farmer(self.test_args)
         self.assertEqual(str(ex.exception), 'Must specify farming address if one is not available.')
 
     def test_farmer_init_url(self):
