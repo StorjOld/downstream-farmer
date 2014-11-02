@@ -8,9 +8,11 @@ downstream-farmer
 
 `downstream-farmer` talks to [downstream-node](https://github.com/Storj/downstream-node).  In order to use it, you'll need a node up and running.  `downstream-node` requires MySQL and a working config, but *this app*, `downstream-farmer`, will require python-dev and libcrypto++-dev to install from source.
 
+*Note*: If you are building on OSX, you can install crypto++ using homebrew: `$ brew install cryptopp`.
+
 ```
 $ sudo apt-get install python-dev libcrypto++-dev git python-pip
-$ git clone -b devel https://github.com/Storj/downstream-farmer.git
+$ git clone https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
 $ pip install -r requirements.txt .
 ```
