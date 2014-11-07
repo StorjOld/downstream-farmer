@@ -55,5 +55,8 @@ docs/_build/
 # PyBuilder
 target/
 
+# PyInstaller
+src/pyinstaller/
+
 # PyCharm/Intellij
 .idea
