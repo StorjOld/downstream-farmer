@@ -66,7 +66,7 @@ class Farmer(object):
             url = args.node_url
         else:
             url = self.state.get('last_url',
-                                 'http://verify.driveshare.org:8000')
+                                 'https://live.driveshare.org:8443')
 
         self.url = url.strip('/')
         print('Using url {0}'.format(self.url))

@@ -509,7 +509,7 @@ class TestShell(unittest.TestCase):
                 mock.patch.object(Farmer,'check_connectivity') as c:
             r.side_effect = MockStateRestore(dict())
             farmer = Farmer(self.test_args)
-            self.assertEqual(farmer.url, 'http://verify.driveshare.org:8000')
+            self.assertEqual(farmer.url, 'https://live.driveshare.org:8443')
 
     def test_farmer_init_token(self):
         self.test_args.address = None
