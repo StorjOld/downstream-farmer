@@ -19,11 +19,5 @@ setup(
         'base58',
         'RandomIO',
         'storj-heartbeat'
-    ],
-    entry_points={
-        'console_scripts': [
-            'downstream = downstream_farmer.shell:main'
-        ]
-    } # ,
-#    console=['ds.py']
+    ]
 )
