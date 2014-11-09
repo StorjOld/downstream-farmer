@@ -4,3 +4,4 @@ base58
 
 git+https://github.com/Storj/heartbeat.git#egg=storj-heartbeat
 git+https://github.com/Storj/RandomIO.git#egg=RandomIO
+git+https://github.com/wiggzz/siggy.git#egg=siggy

@@ -18,6 +18,7 @@ setup(
         'requests',
         'base58',
         'RandomIO',
-        'storj-heartbeat'
+        'storj-heartbeat',
+        'siggy'
     ]
 )
