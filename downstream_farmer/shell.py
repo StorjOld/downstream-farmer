@@ -61,7 +61,7 @@ def restore(path):
             with open(path, 'r') as f:
                 return json.load(f)
         except Exception as ex:
-            raise DownstreamError('Couldn\'t parse {0}: {1}'.format(path,str(ex)))
+            raise DownstreamError('Couldn\'t parse \'{0}\': {1}'.format(path,str(ex)))
     else:
         return dict()
 
