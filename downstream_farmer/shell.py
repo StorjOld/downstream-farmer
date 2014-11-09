@@ -268,7 +268,7 @@ def parse_args():
                         'Default is {0} bytes'.format(default_size))
     parser.add_argument('-a', '--address', help='SJCX address for farming. You'
                         ' can specify this if you have multiple identities and'
-                        'would like to farm under one of them.  Otherwise by '
+                        ' would like to farm under one of them.  Otherwise by '
                         'default, an address from your identity file ({0}) '
                         'will be used.'.format(identity_path))
     parser.add_argument('-t', '--token', help='Farming token to use.  If you '

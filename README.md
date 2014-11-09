@@ -27,7 +27,8 @@ For example, on Counterwallet, click on Address Actions, and then Sign Message. 
 {
 "19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV": {
  "message": "test message",
- "signature": "HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqFcdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I="
+ "signature": "HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqF\
+               cdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I="
 }
 ```
 
@@ -40,12 +41,13 @@ $ downstream
 The usage of the program is:
 
 ```
-usage: downstream [-h] [-V] [-n NUMBER] [-p PATH] [-s SIZE] [-a ADDRESS]
-                  [-t TOKEN] [-f]
+usage: downstream [-h] [-V] [-n NUMBER] [-p HISTORY] [-s SIZE] [-a ADDRESS]
+                  [-t TOKEN] [-f] [-i IDENTITY] [-k]
                   [node_url]
 
 positional arguments:
-  node_url              URL of the downstream node to connect to
+  node_url              URL of the downstream node to connect to. The default
+                        node is https://live.driveshare.org:8443
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -53,24 +55,42 @@ optional arguments:
   -n NUMBER, --number NUMBER
                         Number of challenges to perform. If unspecified,
                         perform challenges until killed.
-  -p PATH, --path PATH  Path to save/load state from. The state file saves
-                        your last connected node, your farming tokens, your
-                        SJCX address, and other data. The default is
-                        data\state.json
+  -p HISTORY, --history HISTORY
+                        Path to save/load history from. The history file saves
+                        your farming tokens for each node you connect to. The
+                        default path is data\history.json.
   -s SIZE, --size SIZE  Total size of contracts to obtain in bytes. Default is
                         100 bytes
   -a ADDRESS, --address ADDRESS
-                        SJCX address for farming. You only need to specify
-                        this the first time you connect after that, your
-                        address is saved by the node under your farming token
+                        SJCX address for farming. You can specify this if you
+                        have multiple identities and would like to farm under
+                        one of them. Otherwise by default, an address from
+                        your identity file (data\identities.json) will be
+                        used.
   -t TOKEN, --token TOKEN
                         Farming token to use. If you already have a farming
                         token, you can reconnect to the node with it by
                         specifying it here. By default a new token will be
-                        obtained if you specify an SJCX address to use.
+                        obtained. Any tokens obtained will be saved in the
+                        history JSON file.
   -f, --forcenew        Force obtaining a new token. If the node has been
                         reset and your token has been deleted, it may be
                         necessary to force your farmer to obtain a new token.
+  -i IDENTITY, --identity IDENTITY
+                        Specify an identity file to  provide a signature to
+                        prove ownership of your SJCX address. The default path
+                        is data\identities.json.  The file format should be a
+                        JSON dictionary like the following:
+                        {
+                           "your sjcx address": {
+                              "message": "your message here",
+                              "signature": "base64 signature from bitcoin\
+                                             wallet or counterparty",
+                           }
+                        }
+                        If an identity is specified in this file, it will be
+                        used for connecting to any new nodes.
+  -k, --keepalive       Will attempt to reconnect upon failure.
 ```
 
 This prototype performs three simple functions.  It connects to the specified node, it requests a chunk (which also gives it the first chunk challenge and information to recreate the test file), and then it answers the chunk challenge.
