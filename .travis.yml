@@ -16,7 +16,7 @@
     
   install:
     - "pip install flake8 coverage coveralls"
-    - "pip install -r requirements.txt ."
+    - "pip install -r requirements.txt"
     - "git clone -b devel https://github.com/storj/downstream-node.git node"
     - "cd node ; pip install -r requirements.txt ."
     - "mkdir data && cd data"
@@ -41,7 +41,7 @@
   script:
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
-    - "downstream -n 2 -a 19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV --signature 'data/signature.txt' 'http://localhost:5000'"
+    - "python downstream.py -n 2 -a 19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV --signature 'data/signature.txt' 'http://localhost:5000'"
 
 #  notifications:
 #    slack: storj:IwoHonDxA5lauvwcKZRMkfps
