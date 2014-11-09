@@ -16,6 +16,16 @@ from .exc import DownstreamError
 import six
 
 
+class SmartFormatter(argparse.HelpFormatter):
+    """From http://stackoverflow.com/questions/3853722/python-argparse-how-to-insert-newline-in-the-help-text  # NOQA
+    """
+    def _split_lines(self, text, width):
+        # this is the RawTextHelpFormatter._split_lines
+        if text.startswith('R|'):
+            return text[2:].splitlines()
+        return argparse.HelpFormatter._split_lines(self, text, width)
+
+
 def fail_exit(msg, exit_code=1):
     sys.stderr.write('%s\n' % msg)
     sys.exit(exit_code)
@@ -23,6 +33,33 @@ def fail_exit(msg, exit_code=1):
 
 def handler(signum=None, frame=None):
     sys.exit(0)
+
+
+def save(path, obj):
+    """saves the farmer state to disk
+
+    :param path: the path to save to
+    :param obj: the object to save (must be json serializable)
+    """
+    (head, tail) = os.path.split(path)
+    if (len(head) > 0 and not os.path.isdir(head)):
+        os.mkdir(head)
+    with open(path, 'w+') as f:
+        json.dump(obj, f)
+
+
+def restore(path):
+    """restores state from disk
+
+    :param path: the path to restore from
+    :returns: the object restored, or an empty dict(), if the file doesn't
+        exist
+    """
+    if (os.path.exists(path)):
+        with open(path, 'r') as f:
+            return json.load(f)
+    else:
+        return dict()
 
 
 class Farmer(object):
@@ -39,13 +76,13 @@ class Farmer(object):
         4) if no token is on disk, it will attempt to retrieve a new farming
            token from the node.  this requires an address.
         5) if no address is specified on the command line, it will attempt to
-           load the address for the node from disk
+           load the address for the node from the identities file
         6) if no address is available, fail.
         7) if an address is given on the command line that is different from
            the saved address, it uses the specified address and obtains a new
            token
 
-        :returns: a dictionary with the arguments
+        :param args: the arguments from the command line
         """
         if args.number is not None and args.number < 1:
             raise DownstreamError(
@@ -58,23 +95,26 @@ class Farmer(object):
 
         self.size = args.size
 
-        self.path = args.path
+        self.history_path = args.history
+        self.identity_path = args.identity
 
-        self.restore()
+        self.state = restore(self.history_path)
+        self.identities = restore(self.identity_path)
 
-        # resolve url
-        if (args.node_url is not None):
-            url = args.node_url
+        if (args.node_url is None):
+            if ('last_node' in self.state):
+                url = self.state['last_node']
+            else:
+                url = 'https://live.driveshare.org:8443'
         else:
-            url = self.state.get('last_url',
-                                 'https://live.driveshare.org:8443')
+            url = args.node_url
 
         self.url = url.strip('/')
         print('Using url {0}'.format(self.url))
 
         self.check_connectivity()
 
-        self.state['last_url'] = self.url
+        self.state['last_node'] = self.url
 
         saved_token = self.state.get('nodes', dict()).\
             get(self.url, dict()).get('token', None)
@@ -101,6 +141,15 @@ class Farmer(object):
         else:
             self.address = saved_address
 
+        if (self.address is None):
+            # no address specified on command line or in history with this
+            # node, let's get one from the identities file if we can!
+            print(self.identities)
+            if (len(self.identities) > 0):
+                # we have at least one identity...
+                # just take the first one
+                self.address = next(iter(self.identities))
+
         if (self.token is None and self.address is None):
             raise DownstreamError(
                 'Must specify farming address if one is not available.')
@@ -111,9 +160,22 @@ class Farmer(object):
         if (self.address is not None):
             print('Farming on address {0}'.format(self.address))
 
-        if (self.token is None and args.signature is not None):
-            self.read_signature(args.signature)
-            # verify that it is correct
+        if (self.token is None and self.address in self.identities):
+            if ('message' not in self.identities[self.address] or
+                    'signature' not in self.identities[self.address]):
+                raise DownstreamError(
+                    'The file format for the identity file '
+                    '{0} should be a JSON formatted dictionary like the '
+                    'following:\n'
+                    '   {{\n'
+                    '      "your sjcx address": {{\n'
+                    '         "message": "your message here",\n'
+                    '         "signature":  "base64 signature from bitcoin '
+                    'wallet or counterparty",\n'
+                    '      }}\n'
+                    '   }}'.format(self.identity_path))
+            self.message = self.identities[self.address]['message']
+            self.signature = self.identities[self.address]['signature']
             if (not siggy.verify_signature(self.message,
                                            self.signature,
                                            self.address)):
@@ -124,24 +186,6 @@ class Farmer(object):
             self.message = ''
             self.signature = ''
 
-    def save(self):
-        """saves the farmer state to disk
-        """
-        (head, tail) = os.path.split(self.path)
-        if (len(head) > 0 and not os.path.isdir(head)):
-            os.mkdir(head)
-        with open(self.path, 'w+') as f:
-            json.dump(self.state, f)
-
-    def restore(self):
-        """restores state from disk
-        """
-        if (os.path.exists(self.path)):
-            with open(self.path, 'r') as f:
-                self.state = json.load(f)
-        else:
-            self.state = dict()
-
     def check_connectivity(self):
         """ Check to see if we even get a connection to the server.
         https://stackoverflow.com/questions/3764291/checking-network-connection
@@ -151,41 +195,39 @@ class Farmer(object):
         except six.moves.urllib.error.URLError:
             raise DownstreamError("Could not connect to server.")
 
-    def read_signature(self, path):
-        """Reads a simple signature from file.
-
-        Sets self.message and self.signature
-
-        :param path: the path to the file to read the signature from
-        """
-        with open(path, 'r') as f:
-            dict = json.load(f)
-            self.message = dict['message']
-            self.signature = dict['signature']
-
-    def run(self):
+    def run(self, reconnect=False):
         client = DownstreamClient(
             self.url, self.token, self.address,
             self.size, self.message, self.signature)
 
-        client.connect()
+        while (1):
+            try:
+                client.connect()
 
-        # connection successful, save our state, then begin farming
-        self.state.setdefault('nodes', dict())[client.server] = {
-            'token': client.token,
-            'address': client.address
-        }
+                # connection successful, save our state, then begin farming
+                self.state.setdefault('nodes', dict())[client.server] = {
+                    'token': client.token,
+                    'address': client.address
+                }
 
-        self.save()
+                save(self.history_path, self.state)
 
-        client.run(self.number)
+                client.run(self.number)
+            except Exception as ex:
+                if (not reconnect):
+                    raise
+                else:
+                    print(str(ex))
+                    print('Reconnecting...')
+            else:
+                break
 
 
 def eval_args(args):
     try:
         farmer = Farmer(args)
 
-        farmer.run()
+        farmer.run(args.keepalive)
 
     except DownstreamError as e:
         fail_exit('Error: {0}'.format(str(e)))
@@ -196,41 +238,59 @@ def eval_args(args):
 
 
 def parse_args():
-    default_path = os.path.join('data', 'history.json')
+    history_path = os.path.join('data', 'history.json')
+    identity_path = os.path.join('data', 'identities.json')
     default_size = 100
-    parser = argparse.ArgumentParser('downstream')
+    default_url = 'https://live.driveshare.org:8443'
+    parser = argparse.ArgumentParser(
+        'downstream', formatter_class=SmartFormatter)
     parser.add_argument('-V', '--version', action='version',
                         version=__version__)
     parser.add_argument('node_url', nargs='?',
-                        help='URL of the downstream node to connect to')
+                        help='URL of the downstream node to connect to. '
+                        'The default node is {0}'.format(default_url))
     parser.add_argument('-n', '--number', type=int,
                         help='Number of challenges to perform. '
                         'If unspecified, perform challenges until killed.')
-    parser.add_argument('-p', '--path',
-                        default=default_path,
-                        help='Path to save/load state from.  The state file '
-                        'saves your last connected node, your farming tokens, '
-                        'your SJCX address, and other data.  The default is '
-                        '{0}'.format(default_path))
+    parser.add_argument('-p', '--history', default=history_path,
+                        help='Path to save/load history from. The history file'
+                        ' saves your farming tokens for each node you connect '
+                        'to.  The default path is {0}.'.format(history_path))
     parser.add_argument('-s', '--size', type=int, default=default_size,
                         help='Total size of contracts to obtain in bytes. '
                         'Default is {0} bytes'.format(default_size))
     parser.add_argument('-a', '--address', help='SJCX address for farming. You'
-                        ' only need to specify this the first time you connect'
-                        ' after that, your address is saved by the node under '
-                        'your farming token')
+                        ' can specify this if you have multiple identities and'
+                        'would like to farm under one of them.  Otherwise by '
+                        'default, an address from your identity file ({0}) '
+                        'will be used.'.format(identity_path))
     parser.add_argument('-t', '--token', help='Farming token to use.  If you '
                         'already have a farming token, you can reconnect to '
                         'the node with it by specifying it here.  By default '
-                        'a new token will be obtained if you specify an SJCX '
-                        'address to use.')
+                        'a new token will be obtained.  Any tokens obtained '
+                        'will be saved in the history JSON file.')
     parser.add_argument('-f', '--forcenew', help='Force obtaining a new token.'
                         ' If the node has been reset and your token has been '
                         'deleted, it may be necessary to force your farmer to '
                         'obtain a new token.',
                         action='store_true')
-    parser.add_argument('-g', '--signature', help='Specify a path to a signed '
-                        'message to verify ownership of SJCX address.')
+    parser.add_argument('-i', '--identity', default=identity_path,
+                        help='R|Specify an identity file to  provide a '
+                        'signature to\nprove ownership of your SJCX address. '
+                        'The default path\nis {0}.  The file format should be '
+                        'a\nJSON dictionary like the following:\n'
+                        '{{\n'
+                        '   "your sjcx address": {{\n'
+                        '      "message": "your message here",\n'
+                        '      "signature": "base64 signature from bitcoin\\\n'
+                        '                     wallet or counterparty",\n'
+                        '   }}\n'
+                        '}}\n'
+                        'If an identity is specified in this file, it will '
+                        'be\nused for connecting to any new nodes.'
+                        .format(identity_path))
+    parser.add_argument('-k', '--keepalive', help='Will attempt to reconnect '
+                        'upon failure.', action='store_true')
     return parser.parse_args()
 
 

@@ -16,7 +16,7 @@ import requests
 from datetime import datetime, timedelta
 
 from downstream_farmer import utils, shell
-from downstream_farmer.shell import Farmer
+from downstream_farmer.shell import Farmer, save, restore
 from downstream_farmer.client import DownstreamClient, DownstreamContract
 from downstream_farmer.exc import DownstreamError
 from heartbeat import Heartbeat
@@ -427,12 +427,12 @@ class TestExceptions(unittest.TestCase):
         e = DownstreamError('Test Exception')
         self.assertEqual(str(e), 'Test Exception')
 
-class MockStateRestore(object):
-    def __init__(self, state):
-        self.state = state
+class MockRestore(object):
+    def __init__(self, table):
+        self.table = table
     
-    def __call__(self, dummy):
-        dummy.state = self.state
+    def __call__(self, arg):
+        return self.table[arg]
 
 class TestShell(unittest.TestCase):
     def setUp(self):
@@ -446,9 +446,9 @@ class TestShell(unittest.TestCase):
         self.test_args.token = 'testtoken'
         self.test_args.address = 'testaddress'
         self.test_args.size = 100
-        self.test_args.path = 'statefile'
+        self.test_args.history = 'historyfile'
         self.test_args.forcenew = False
-        self.test_args.signature = None
+        self.test_args.identity = 'identityfile'
 
     def tearDown(self):
         sys.argv = self._old_argv
@@ -475,107 +475,107 @@ class TestShell(unittest.TestCase):
         
     def test_farmer_init_forcenew(self):
         self.test_args.forcenew = True
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
         self.assertIsNone(farmer.token)
     
     def test_farmer_init_no_token_no_address(self):
         self.test_args.token = None
         self.test_args.address = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c,\
                 self.assertRaises(DownstreamError) as ex:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             Farmer(self.test_args)
         self.assertEqual(str(ex.exception), 'Must specify farming address if one is not available.')
 
     def test_farmer_init_url(self):
         self.test_args.node_url = 'testurl'
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, self.test_args.node_url)
-            self.assertEqual(farmer.state['last_url'], self.test_args.node_url)
+            self.assertEqual(farmer.state['last_node'], self.test_args.node_url)
 
     def test_farmer_init_url_from_state(self):
         self.test_args.node_url = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore({'last_url':'stateurl'})
+            r.side_effect = MockRestore({'historyfile':{'last_node':'stateurl'},'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, 'stateurl')
             
     def test_farmer_init_url_default(self):
         self.test_args.node_url = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.url, 'https://live.driveshare.org:8443')
 
     def test_farmer_init_token(self):
         self.test_args.address = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, self.test_args.token)
     
     def test_farmer_init_token_from_state(self):
         self.test_args.token = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
-                mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(
-                {
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
+                mock.patch.object(Farmer,'check_connectivity') as c:        
+            r.side_effect = MockRestore({
+                'historyfile':{
                     'nodes':{
                         self.test_args.node_url.strip('/'):{
                             'token': 'statetoken',
                             'address': 'testaddress'
                         }
                     }
-                })
+                },
+                'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, 'statetoken')
             
     def test_farmer_init_token_default(self):
         self.test_args.token = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.token, None)
             
     def test_farmer_init_address(self):
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, self.test_args.address)
             
     def test_farmer_init_address_from_state(self):
         self.test_args.address = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(
-                {
+            r.side_effect = MockRestore({'historyfile':{
                     'nodes':{
                         self.test_args.node_url.strip('/'):{
                             'token': 'statetoken',
                             'address': 'stateaddress'
                         }
                     }
-                })
+                },'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, 'stateaddress')
             
     def test_farmer_init_address_default(self):
         self.test_args.address = None
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             self.assertEqual(farmer.address, None)
             
@@ -587,14 +587,14 @@ class TestShell(unittest.TestCase):
             farmer = Farmer(None)
         farmer.path = path
         farmer.state = d
-        farmer.save()
-        farmer.restore()
+        save(farmer.path, farmer.state)
+        farmer.state = restore(farmer.path)
         self.assertEqual(d, farmer.state)
         os.remove(path)
         
         #test path doesn't exist
         farmer.path = 'nonexistentpath'
-        farmer.restore()
+        farmer.state = restore(farmer.path)
         self.assertEqual(farmer.state, dict())        
         
         # test directory creation
@@ -602,18 +602,18 @@ class TestShell(unittest.TestCase):
         path = os.path.join(dir,'file')
         farmer.path = path
         farmer.state = d
-        farmer.save()
+        save(farmer.path, farmer.state)
         self.assertTrue(os.path.isdir(dir))
         self.assertTrue(os.path.exists(path))
-        farmer.restore()
+        farmer.state = restore(farmer.path)
         self.assertEqual(d, farmer.state)
         os.remove(path)
         os.rmdir(dir)
         
     def test_farmer_check_connectivity(self):
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch('six.moves.urllib.request.urlopen') as patch:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
             patch.side_effect = URLError('Problem')
             with self.assertRaises(DownstreamError) as ex:
@@ -624,24 +624,24 @@ class TestShell(unittest.TestCase):
             self.assertTrue(patch.called)
     
     def test_farmer_run(self):
-        with mock.patch.object(Farmer,'restore',autospec=True) as r,\
+        with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch('six.moves.urllib.request.urlopen') as patch:
-            r.side_effect = MockStateRestore(dict())
+            r.side_effect = MockRestore({'historyfile':dict(),'identityfile':dict()})
             farmer = Farmer(self.test_args)
         with mock.patch('downstream_farmer.shell.DownstreamClient') as patch,\
-                mock.patch.object(Farmer,'save',autospec=True):
+                mock.patch('downstream_farmer.shell.save',autospec=True) as s:
             patch.return_value.token = 'foo'
             farmer.run()            
             patch.assert_called_with(farmer.url, farmer.token, farmer.address, farmer.size, '', '')
             self.assertTrue(patch.return_value.connect.called)
             self.assertEqual(farmer.state['nodes'][patch.return_value.server]['token'],
                 patch.return_value.token)
-            self.assertTrue(farmer.save.called)
+            self.assertTrue(s.called)
             patch.return_value.run.assert_called_with(farmer.number)
  
     def test_eval_args_run(self):
         with mock.patch('downstream_farmer.shell.Farmer') as farmer:
-            shell.eval_args(None)
+            shell.eval_args(mock.MagicMock())
         self.assertTrue(farmer.called)
         self.assertTrue(farmer.return_value.run.called)
  
@@ -683,14 +683,14 @@ class TestShell(unittest.TestCase):
         self.assertEqual(args.number, None)
      
     def test_parse_args_path(self):        
-        sys.argv.append('--path')
+        sys.argv.append('--history')
         sys.argv.append('testpath')
         args = shell.parse_args()
-        self.assertEqual(args.path, sys.argv[2])
+        self.assertEqual(args.history, sys.argv[2])
     
-    def test_parse_args_path_default(self):
+    def test_parse_args_history_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.path, os.path.join('data','history.json'))
+        self.assertEqual(args.history, os.path.join('data','history.json'))
         
     def test_parse_args_size(self):        
         sys.argv.append('--size')
