@@ -1,6 +1,0 @@
-this is an example message
-----BEGIN SIGNATURE----
-AWI7lqr01tbyOCd76tM4y4O3dMcYFwrxJV2grC5
-cM0sK0f1BGldLtfGU3byqp8Wjzxwo7hlgwb1vKL
-KgfKgN1vA=
-----END SIGNATURE----

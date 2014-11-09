@@ -162,20 +162,9 @@ class Farmer(object):
         signature = ''
         writing_to = 'm'
         with open(path, 'r') as f:
-            lines = f.readlines()
-            for line in lines:
-                if (line.strip('\n') == '----BEGIN SIGNATURE----'):
-                    message = message.strip('\n')
-                    writing_to = 's'
-                elif (line.strip('\n') == '----END SIGNATURE----'):
-                    self.message = message
-                    self.signature = signature
-                    return
-                elif (writing_to == 'm'):
-                    message += line
-                elif (writing_to == 's'):
-                    signature += line.strip('\n')
-        raise DownstreamError('Formatting error: Could not read signature.')
+            dict = json.load(f)
+            self.message = dict['message']
+            self.signature = dict['signature']
 
     def run(self):
         client = DownstreamClient(

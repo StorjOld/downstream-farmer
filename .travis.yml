@@ -41,7 +41,7 @@
   script:
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
-    - "python downstream.py -n 2 -a 19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV --signature 'data/signature.txt' 'http://localhost:5000'"
+    - "downstream -n 2 -a 19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV --signature 'data/signature.json' 'http://localhost:5000'"
 
 #  notifications:
 #    slack: storj:IwoHonDxA5lauvwcKZRMkfps

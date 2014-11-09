@@ -48,7 +48,7 @@ coverage.xml
 
 # data directory
 data/*
-!data/signature.txt
+!data/signature.json
 
 # Sphinx documentation
 docs/_build/

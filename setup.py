@@ -20,5 +20,10 @@ setup(
         'RandomIO',
         'storj-heartbeat',
         'siggy'
-    ]
+    ],
+    entry_points={
+        'console_scripts': [
+            'downstream = downstream_farmer.shell:main'
+        ]
+    }
 )
