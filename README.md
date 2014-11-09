@@ -25,10 +25,10 @@ For example, on Counterwallet, click on Address Actions, and then Sign Message. 
 
 ```json
 {
-"19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV": {
- "message": "test message",
- "signature": "HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqF\
-               cdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I="
+  "19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV": {
+	 "message": "test message",
+	 "signature": "HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqFcdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I="
+  }
 }
 ```
 
