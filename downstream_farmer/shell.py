@@ -18,8 +18,10 @@ import six
 
 
 class SmartFormatter(argparse.HelpFormatter):
+
     """From http://stackoverflow.com/questions/3853722/python-argparse-how-to-insert-newline-in-the-help-text  # NOQA
     """
+
     def _split_lines(self, text, width):
         # this is the RawTextHelpFormatter._split_lines
         if text.startswith('R|'):
@@ -61,7 +63,8 @@ def restore(path):
             with open(path, 'r') as f:
                 return json.load(f)
         except Exception as ex:
-            raise DownstreamError('Couldn\'t parse \'{0}\': {1}'.format(path,str(ex)))
+            raise DownstreamError(
+                'Couldn\'t parse \'{0}\': {1}'.format(path, str(ex)))
     else:
         return dict()
 
