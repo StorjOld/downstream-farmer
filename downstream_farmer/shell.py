@@ -7,6 +7,7 @@ import sys
 import argparse
 import json
 import signal
+import time
 import siggy
 
 from .client import DownstreamClient
@@ -56,8 +57,11 @@ def restore(path):
         exist
     """
     if (os.path.exists(path)):
-        with open(path, 'r') as f:
-            return json.load(f)
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except Exception as ex:
+            raise DownstreamError('Couldn\'t parse {0}: {1}'.format(path,str(ex)))
     else:
         return dict()
 
@@ -144,7 +148,6 @@ class Farmer(object):
         if (self.address is None):
             # no address specified on command line or in history with this
             # node, let's get one from the identities file if we can!
-            print(self.identities)
             if (len(self.identities) > 0):
                 # we have at least one identity...
                 # just take the first one
@@ -218,7 +221,8 @@ class Farmer(object):
                     raise
                 else:
                     print(str(ex))
-                    print('Reconnecting...')
+                    print('Reconnecting in 10 seconds...')
+                    time.sleep(10)
             else:
                 break
 

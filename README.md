@@ -17,9 +17,24 @@ $ cd downstream-farmer
 $ pip install -r requirements.txt .
 ```
 
-And connect to our test node by running:
+To connect to our test node, you must have a whitelisted address and provide signed verification of ownership of that address.
+
+There are a couple of ways to do this.  If you have your private keys in a local bitcoin wallet such as the mainline Bitcoin Client, Multibit, Armory, or Electrum, sign a message of your choice with your SJCX address that has a crowdsale balance of at least 10,000 SJCX.  Then make sure the message and signature are included in your `identities.json` file.
+
+For example, on Counterwallet, click on Address Actions, and then Sign Message.  Type a message of your choice, and click Sign.  Then copy and paste the message and signature into the `identities.json` file in the `data/` directory.  For example:
+
+```json
+{
+"19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV": {
+ "message": "test message",
+ "signature": "HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqFcdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I="
+}
 ```
-$ downstream -a YOUR_SJCX_ADDRESS
+
+Ensure that any whitespace in the message is included in the JSON string and that it is enclosed with double quotes.  Then, you can connect to our test node by running:
+
+```
+$ downstream
 ```
 
 The usage of the program is:

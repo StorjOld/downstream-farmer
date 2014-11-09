@@ -65,7 +65,6 @@ class DownstreamClient(object):
         try:
             r_json = handle_json_response(resp)
         except DownstreamError as ex:
-            # can't handle a connect error.  fail.
             raise DownstreamError('Unable to connect: {0}'.
                                   format(str(ex)))
 
