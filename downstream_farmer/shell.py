@@ -7,6 +7,7 @@ import sys
 import argparse
 import json
 import signal
+import siggy
 
 from .client import DownstreamClient
 from .version import __version__
@@ -16,7 +17,7 @@ import six
 
 
 def fail_exit(msg, exit_code=1):
-    sys.stderr.write('Error: %s\n' % msg)
+    sys.stderr.write('%s\n' % msg)
     sys.exit(exit_code)
 
 
@@ -110,6 +111,19 @@ class Farmer(object):
         if (self.address is not None):
             print('Farming on address {0}'.format(self.address))
 
+        if (self.token is None and args.signature is not None):
+            self.read_signature(args.signature)
+            # verify that it is correct
+            if (not siggy.verify_signature(self.message,
+                                           self.signature,
+                                           self.address)):
+                raise DownstreamError(
+                    'Signature provided does not match address being used. '
+                    'Check your formatting, your SJCX address, and try again.')
+        else:
+            self.message = ''
+            self.signature = ''
+
     def save(self):
         """saves the farmer state to disk
         """
@@ -137,9 +151,36 @@ class Farmer(object):
         except six.moves.urllib.error.URLError:
             raise DownstreamError("Could not connect to server.")
 
+    def read_signature(self, path):
+        """Reads a simple signature from file.
+
+        Sets self.message and self.signature
+
+        :param path: the path to the file to read the signature from
+        """
+        message = ''
+        signature = ''
+        writing_to = 'm'
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                if (line.strip('\n') == '----BEGIN SIGNATURE----'):
+                    message = message.strip('\n')
+                    writing_to = 's'
+                elif (line.strip('\n') == '----END SIGNATURE----'):
+                    self.message = message
+                    self.signature = signature
+                    return
+                elif (writing_to == 'm'):
+                    message += line
+                elif (writing_to == 's'):
+                    signature += line.strip('\n')
+        raise DownstreamError('Formatting error: Could not read signature.')
+
     def run(self):
         client = DownstreamClient(
-            self.url, self.token, self.address, self.size)
+            self.url, self.token, self.address,
+            self.size, self.message, self.signature)
 
         client.connect()
 
@@ -169,7 +210,7 @@ def eval_args(args):
 
 
 def parse_args():
-    default_path = os.path.join('data', 'state.json')
+    default_path = os.path.join('data', 'history.json')
     default_size = 100
     parser = argparse.ArgumentParser('downstream')
     parser.add_argument('-V', '--version', action='version',
@@ -202,6 +243,8 @@ def parse_args():
                         'deleted, it may be necessary to force your farmer to '
                         'obtain a new token.',
                         action='store_true')
+    parser.add_argument('-g', '--signature', help='Specify a path to a signed '
+                        'message to verify ownership of SJCX address.')
     return parser.parse_args()
 
 

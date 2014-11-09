@@ -209,10 +209,14 @@ class TestClient(unittest.TestCase):
         self.size = 100
         self.address = base58.b58encode_check(b'\x00'+os.urandom(20))
         self.token = binascii.hexlify(os.urandom(16)).decode('ascii')
+        self.msg = ''
+        self.sig = ''
         self.client = DownstreamClient(self.server_url,
                                        self.token,
                                        self.address,
-                                       self.size)
+                                       self.size,
+                                       self.msg,
+                                       self.sig)
         self.test_contract = DownstreamContract(self.client,
             MockValues.get_chunk_response['file_hash'],
             MockValues.get_chunk_response['seed'],
@@ -444,6 +448,7 @@ class TestShell(unittest.TestCase):
         self.test_args.size = 100
         self.test_args.path = 'statefile'
         self.test_args.forcenew = False
+        self.test_args.signature = None
 
     def tearDown(self):
         sys.argv = self._old_argv
@@ -627,7 +632,7 @@ class TestShell(unittest.TestCase):
                 mock.patch.object(Farmer,'save',autospec=True):
             patch.return_value.token = 'foo'
             farmer.run()            
-            patch.assert_called_with(farmer.url, farmer.token, farmer.address, farmer.size)
+            patch.assert_called_with(farmer.url, farmer.token, farmer.address, farmer.size, '', '')
             self.assertTrue(patch.return_value.connect.called)
             self.assertEqual(farmer.state['nodes'][patch.return_value.server]['token'],
                 patch.return_value.token)
@@ -685,7 +690,7 @@ class TestShell(unittest.TestCase):
     
     def test_parse_args_path_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.path, os.path.join('data','state.json'))
+        self.assertEqual(args.path, os.path.join('data','history.json'))
         
     def test_parse_args_size(self):        
         sys.argv.append('--size')

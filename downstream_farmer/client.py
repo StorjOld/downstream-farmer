@@ -5,6 +5,7 @@ from __future__ import print_function
 import time
 import binascii
 import hashlib
+import json
 
 import requests
 import heartbeat
@@ -20,11 +21,13 @@ heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
 
 class DownstreamClient(object):
 
-    def __init__(self, url, token, address, size):
+    def __init__(self, url, token, address, size, msg, sig):
         self.server = url.strip('/')
         self.token = token
         self.address = address
         self.desired_size = size
+        self.msg = msg
+        self.sig = sig
         self.heartbeat = None
         self.contracts = list()
 
@@ -38,12 +41,26 @@ class DownstreamClient(object):
             # get a new token
             url = '{0}/api/downstream/new/{1}'.\
                 format(self.server, self.address)
+            # if we have a message/signature to send, send it
+            if (self.msg != '' and self.sig != ''):
+                data = {
+                    "message": self.msg,
+                    "signature": self.sig
+                }
+                headers = {
+                    'Content-Type': 'application/json'
+                }
+                resp = requests.post(
+                    url, data=json.dumps(data), headers=headers)
+            else:
+                # otherwise, just normal request
+                resp = requests.get(url)
         else:
             # try to use our token
             url = '{0}/api/downstream/heartbeat/{1}'.\
                 format(self.server, self.token)
 
-        resp = requests.get(url)
+            resp = requests.get(url)
 
         try:
             r_json = handle_json_response(resp)
