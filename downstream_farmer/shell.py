@@ -158,9 +158,6 @@ class Farmer(object):
 
         :param path: the path to the file to read the signature from
         """
-        message = ''
-        signature = ''
-        writing_to = 'm'
         with open(path, 'r') as f:
             dict = json.load(f)
             self.message = dict['message']
