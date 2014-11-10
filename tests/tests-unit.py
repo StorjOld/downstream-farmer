@@ -293,7 +293,27 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
-
+                         
+    def test_connect_sign(self):
+        self.client.msg = 'test message'
+        self.client.sig = 'HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqFcdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I='
+        self.client.address = '19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'
+        self.client.token = None
+        with mock.patch('downstream_farmer.client.requests.post') as patch:
+            patch.return_value.json.return_value = MockValues.connect_response
+            self.client.connect()
+        patch.assert_called_with('{0}/new/{1}'.format(self.server_url.strip('/')+self.api_path,self.client.address),
+                                 data = json.dumps({
+                                     "message": self.client.msg,
+                                     "signature": self.client.sig
+                                 }),
+                                 headers = {
+                                     'Content-Type': 'application/json'
+                                 })
+        self.assertEqual(self.client.token,MockValues.connect_response['token'])
+        self.assertEqual(self.client.heartbeat,
+                         Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
+        
     def test_get_chunk_no_token(self):
         with mock.patch('downstream_farmer.client.requests.get') as rp,\
                 mock.patch('downstream_farmer.client.handle_json_response') as hp:
@@ -677,6 +697,17 @@ class TestShell(unittest.TestCase):
         self.assertEqual(d, farmer.state)
         os.remove(path)
         os.rmdir(dir)
+        
+        # test parse fail
+        path = 'test_file'
+        with open(path,'w') as f:
+            f.write('test contents')
+        with mock.patch('json.loads') as l:
+            l.side_effect = Exception('test error')
+            with self.assertRaises(DownstreamError) as ex:
+                restore(path)
+            self.assertEqual(str(ex.exception),'Couldn\'t parse \'{0}\': test error'.format(path))
+        os.remove(path)
         
     def test_farmer_check_connectivity(self):
         with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
