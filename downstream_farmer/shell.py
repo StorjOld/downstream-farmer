@@ -202,9 +202,8 @@ class Farmer(object):
         """Loads a signature from the identities file for the address
         we are going to use.  If one is not specified, throws an error.
         """
-        if (self.token is None and self.address in self.identities):
-            # we will use signature since we'll be requesting a new token
-            # and an identity is supposedly specified
+        if (self.address in self.identities):
+            # get the signatures associated with the identity
             if ('message' not in self.identities[self.address] or
                     'signature' not in self.identities[self.address]):
                 raise DownstreamError(
@@ -227,8 +226,8 @@ class Farmer(object):
                     'Signature provided does not match address being used. '
                     'Check your formatting, your SJCX address, and try again.')
         else:
-            # won't need signature since we either have a token, or
             # the address being used does not have any associated signatures
+            # we will attempt to connect without them
             self.message = ''
             self.signature = ''
 
@@ -263,6 +262,15 @@ class Farmer(object):
                 # client finished without an error
                 break
             except Exception as ex:
+                # check if this is a token issue...
+                if (type(ex) is DownstreamError):
+                    if (str(ex) == 'Unable to connect: Nonexistent token.'):
+                        # token didn't exist on the server... clear token
+                        # and try again
+                        print('Given token did not exist on remote server. '
+                            'Attempting to obtain a new token.')
+                        client.token = None                        
+                        continue
                 if (not reconnect):
                     raise
                 else:

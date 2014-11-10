@@ -612,14 +612,14 @@ class TestShell(unittest.TestCase):
             self.assertEqual(farmer.address, None)
     
     def test_farmer_init_address_from_identities(self):
-        self.test_args.address = None
+        self.test_args.address = None        
         with mock.patch('downstream_farmer.shell.restore',autospec=True) as r,\
                 mock.patch.object(Farmer,'check_connectivity') as c:
             r.side_effect = MockRestore({'historyfile':dict(),
                                          'identityfile':
-                                         {'identityaddress':{'signature':'testsig','message':'testmessage'}}})
+                                         {'19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV':{'signature':'HyzVUenXXo4pa+kgm1vS8PNJM83eIXFC5r0q86FGbqFcdla6rcw72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I=','message':'test message'}}})
             farmer = Farmer(self.test_args)
-            self.assertEqual(farmer.address, 'identityaddress')
+            self.assertEqual(farmer.address, '19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV')
     
     def test_farmer_load_signature_invalid_dict(self):
         self.test_args.token = None
