@@ -33,6 +33,12 @@ class DownstreamClient(object):
         self.sig = sig
         self.heartbeat = None
         self.contracts = list()
+        self.cert_path = None
+
+    def set_cert_path(self, cert_path):
+        """Sets the path of a CA-Bundle to use for verifying requests
+        """
+        self.cert_path = cert_path
 
     def connect(self):
         """Connects to a downstream-node server.
@@ -54,16 +60,19 @@ class DownstreamClient(object):
                     'Content-Type': 'application/json'
                 }
                 resp = requests.post(
-                    url, data=json.dumps(data), headers=headers)
+                    url,
+                    data=json.dumps(data),
+                    headers=headers,
+                    verify=self.cert_path)
             else:
                 # otherwise, just normal request
-                resp = requests.get(url)
+                resp = requests.get(url, verify=self.cert_path)
         else:
             # try to use our token
             url = '{0}/heartbeat/{1}'.\
                 format(self.api_url, self.token)
 
-            resp = requests.get(url)
+            resp = requests.get(url, verify=self.cert_path)
 
         try:
             r_json = handle_json_response(resp)
@@ -95,7 +104,7 @@ class DownstreamClient(object):
         """
         url = '{0}/chunk/{1}'.format(self.api_url, self.token)
 
-        resp = requests.get(url)
+        resp = requests.get(url, verify=self.cert_path)
 
         try:
             r_json = handle_json_response(resp)
@@ -116,6 +125,8 @@ class DownstreamClient(object):
             self.heartbeat.challenge_type().fromdict(r_json['challenge']),
             datetime.utcnow() + timedelta(seconds=int(r_json['due'])),
             self.heartbeat.tag_type().fromdict(r_json['tag']))
+
+        contract.set_cert_path(self.cert_path)
 
         self.contracts.append(contract)
 

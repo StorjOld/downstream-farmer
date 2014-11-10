@@ -13,6 +13,7 @@ import siggy
 from .client import DownstreamClient
 from .version import __version__
 from .exc import DownstreamError
+from .utils import resource_path
 
 import six
 
@@ -91,6 +92,9 @@ class Farmer(object):
 
         :param args: the arguments from the command line
         """
+
+        self.cert_path = resource_path('ca-bundle.crt')
+
         self.load_number(args)
 
         self.load_size(args)
@@ -244,6 +248,8 @@ class Farmer(object):
         client = DownstreamClient(
             self.url, self.token, self.address,
             self.size, self.message, self.signature)
+
+        client.set_cert_path(self.cert_path)
 
         while (1):
             try:

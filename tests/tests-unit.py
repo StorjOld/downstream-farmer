@@ -279,7 +279,7 @@ class TestClient(unittest.TestCase):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             patch.return_value.json.return_value = MockValues.connect_response
             self.client.connect()
-        patch.assert_called_with('{0}/new/{1}'.format(self.server_url.strip('/')+self.api_path,self.address))
+        patch.assert_called_with('{0}/new/{1}'.format(self.server_url.strip('/')+self.api_path,self.address), verify = None)
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
@@ -289,7 +289,8 @@ class TestClient(unittest.TestCase):
             patch.return_value.json.return_value = MockValues.connect_response
             self.client.connect()
         patch.assert_called_with('{0}/heartbeat/{1}'.format(
-            self.server_url.strip('/')+self.api_path, self.token))
+            self.server_url.strip('/')+self.api_path, self.token),
+            verify = None)
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
@@ -309,7 +310,8 @@ class TestClient(unittest.TestCase):
                                  }),
                                  headers = {
                                      'Content-Type': 'application/json'
-                                 })
+                                 },
+                                 verify = None)
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))

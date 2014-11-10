@@ -49,6 +49,7 @@ coverage.xml
 # data directory
 data/*
 !data/identities.json
+!data/ca-bundle.crt
 
 # Sphinx documentation
 docs/_build/
