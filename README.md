@@ -32,7 +32,7 @@ For example, on Counterwallet, click on Address Actions, and then Sign Message. 
 }
 ```
 
-Ensure that any whitespace in the message is included in the JSON string and that it is enclosed with double quotes.  Then, you can connect to our test node by running:
+Ensure that any whitespace in the message is included in the JSON string and that it is enclosed with double quotes.  Then, you should be able to connect to our test node by running (assuming your SJCX address is in the crowdsale whitelist):
 
 ```
 $ downstream
