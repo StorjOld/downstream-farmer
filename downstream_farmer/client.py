@@ -20,6 +20,7 @@ heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
 
 api_prefix = '/api/downstream/v1'
 
+
 class DownstreamClient(object):
 
     def __init__(self, url, token, address, size, msg, sig):
