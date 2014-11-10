@@ -91,23 +91,56 @@ class Farmer(object):
 
         :param args: the arguments from the command line
         """
-        if args.number is not None and args.number < 1:
-            raise DownstreamError(
-                'Must specify a positive number of challenges.')
+        self.load_number(args)
 
-        self.number = args.number
+        self.load_size(args)
 
-        if args.size < 1:
-            raise DownstreamError('Must specify a positive size to farm.')
-
-        self.size = args.size
-
+        # restore history and identities from file, if possible
         self.history_path = args.history
         self.identity_path = args.identity
 
         self.state = restore(self.history_path)
         self.identities = restore(self.identity_path)
 
+        self.load_url_and_check(args)
+        
+        self.load_token(args)
+
+        self.load_address(args)
+        
+        self.load_signature(args)
+
+        if (self.token is None and self.address is None):
+            raise DownstreamError(
+                'Must specify farming address if one is not available.')
+
+        if (self.token is not None):
+            print('Using token {0}'.format(self.token))
+
+        if (self.address is not None):
+            print('Farming on address {0}'.format(self.address))\
+            
+    def load_number(self, args):
+        """Loads the number of challenges from the command line
+        """
+        if args.number is not None and args.number < 1:
+            raise DownstreamError(
+                'Must specify a positive number of challenges.')
+
+        self.number = args.number
+    
+    def load_size(self, args):
+        """Loads the total farming size from the command line
+        """
+        if args.size < 1:
+            raise DownstreamError('Must specify a positive size to farm.')
+
+        self.size = args.size
+    
+    def load_url_and_check(self, args):
+        """Loads the target node url from the command line, or from the last
+        known node, or the default.  Also checks connectivity to the node.
+        """
         if (args.node_url is None):
             if ('last_node' in self.state):
                 url = self.state['last_node']
@@ -122,7 +155,11 @@ class Farmer(object):
         self.check_connectivity()
 
         self.state['last_node'] = self.url
-
+    
+    def load_token(self, args):
+        """Either loads a saved token from history, from command line
+        or, sets token to None if a new token is needed
+        """
         saved_token = self.state.get('nodes', dict()).\
             get(self.url, dict()).get('token', None)
 
@@ -136,7 +173,11 @@ class Farmer(object):
                 print('Not using token {0} since '
                       'forcenew was specified.'.format(self.token))
                 self.token = None
-
+    
+    def load_address(self, args):
+        """Loads SJCX address either from history, command line, or from
+        identities file
+        """
         saved_address = self.state.get('nodes', dict()).\
             get(self.url, dict()).get('address', None)
 
@@ -155,18 +196,14 @@ class Farmer(object):
                 # we have at least one identity...
                 # just take the first one
                 self.address = next(iter(self.identities))
-
-        if (self.token is None and self.address is None):
-            raise DownstreamError(
-                'Must specify farming address if one is not available.')
-
-        if (self.token is not None):
-            print('Using token {0}'.format(self.token))
-
-        if (self.address is not None):
-            print('Farming on address {0}'.format(self.address))
-
+        
+    def load_signature(self, args):
+        """Loads a signature from the identities file for the address
+        we are going to use.  If one is not specified, throws an error.
+        """
         if (self.token is None and self.address in self.identities):
+            # we will use signature since we'll be requesting a new token
+            # and an identity is supposedly specified
             if ('message' not in self.identities[self.address] or
                     'signature' not in self.identities[self.address]):
                 raise DownstreamError(
@@ -189,6 +226,8 @@ class Farmer(object):
                     'Signature provided does not match address being used. '
                     'Check your formatting, your SJCX address, and try again.')
         else:
+            # won't need signature since we either have a token, or 
+            # the address being used does not have any associated signatures
             self.message = ''
             self.signature = ''
 
@@ -219,6 +258,9 @@ class Farmer(object):
                 save(self.history_path, self.state)
 
                 client.run(self.number)
+                
+                # client finished without an error
+                break
             except Exception as ex:
                 if (not reconnect):
                     raise
@@ -226,8 +268,6 @@ class Farmer(object):
                     print(str(ex))
                     print('Reconnecting in 10 seconds...')
                     time.sleep(10)
-            else:
-                break
 
 
 def eval_args(args):
