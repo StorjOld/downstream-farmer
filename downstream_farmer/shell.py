@@ -103,11 +103,11 @@ class Farmer(object):
         self.identities = restore(self.identity_path)
 
         self.load_url_and_check(args)
-        
+
         self.load_token(args)
 
         self.load_address(args)
-        
+
         self.load_signature(args)
 
         if (self.token is None and self.address is None):
@@ -119,7 +119,8 @@ class Farmer(object):
 
         if (self.address is not None):
             print('Farming on address {0}'.format(self.address))\
-            
+
+
     def load_number(self, args):
         """Loads the number of challenges from the command line
         """
@@ -128,7 +129,7 @@ class Farmer(object):
                 'Must specify a positive number of challenges.')
 
         self.number = args.number
-    
+
     def load_size(self, args):
         """Loads the total farming size from the command line
         """
@@ -136,7 +137,7 @@ class Farmer(object):
             raise DownstreamError('Must specify a positive size to farm.')
 
         self.size = args.size
-    
+
     def load_url_and_check(self, args):
         """Loads the target node url from the command line, or from the last
         known node, or the default.  Also checks connectivity to the node.
@@ -155,7 +156,7 @@ class Farmer(object):
         self.check_connectivity()
 
         self.state['last_node'] = self.url
-    
+
     def load_token(self, args):
         """Either loads a saved token from history, from command line
         or, sets token to None if a new token is needed
@@ -173,7 +174,7 @@ class Farmer(object):
                 print('Not using token {0} since '
                       'forcenew was specified.'.format(self.token))
                 self.token = None
-    
+
     def load_address(self, args):
         """Loads SJCX address either from history, command line, or from
         identities file
@@ -196,7 +197,7 @@ class Farmer(object):
                 # we have at least one identity...
                 # just take the first one
                 self.address = next(iter(self.identities))
-        
+
     def load_signature(self, args):
         """Loads a signature from the identities file for the address
         we are going to use.  If one is not specified, throws an error.
@@ -226,7 +227,7 @@ class Farmer(object):
                     'Signature provided does not match address being used. '
                     'Check your formatting, your SJCX address, and try again.')
         else:
-            # won't need signature since we either have a token, or 
+            # won't need signature since we either have a token, or
             # the address being used does not have any associated signatures
             self.message = ''
             self.signature = ''
@@ -258,7 +259,7 @@ class Farmer(object):
                 save(self.history_path, self.state)
 
                 client.run(self.number)
-                
+
                 # client finished without an error
                 break
             except Exception as ex:
