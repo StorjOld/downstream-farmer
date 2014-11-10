@@ -18,11 +18,13 @@ from .contract import DownstreamContract
 heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
                    'Merkle': heartbeat.Merkle.Merkle}
 
+api_prefix = '/api/downstream/v1'
 
 class DownstreamClient(object):
 
     def __init__(self, url, token, address, size, msg, sig):
         self.server = url.strip('/')
+        self.api_url = self.server + api_prefix
         self.token = token
         self.address = address
         self.desired_size = size
@@ -39,8 +41,8 @@ class DownstreamClient(object):
                 raise DownstreamError(
                     'If no token is specified, address must be.')
             # get a new token
-            url = '{0}/api/downstream/new/{1}'.\
-                format(self.server, self.address)
+            url = '{0}/new/{1}'.\
+                format(self.api_url, self.address)
             # if we have a message/signature to send, send it
             if (self.msg != '' and self.sig != ''):
                 data = {
@@ -57,8 +59,8 @@ class DownstreamClient(object):
                 resp = requests.get(url)
         else:
             # try to use our token
-            url = '{0}/api/downstream/heartbeat/{1}'.\
-                format(self.server, self.token)
+            url = '{0}/heartbeat/{1}'.\
+                format(self.api_url, self.token)
 
             resp = requests.get(url)
 
@@ -90,7 +92,7 @@ class DownstreamClient(object):
 
         :param size: the maximum size of the contract, not yet used
         """
-        url = '{0}/api/downstream/chunk/{1}'.format(self.server, self.token)
+        url = '{0}/chunk/{1}'.format(self.api_url, self.token)
 
         resp = requests.get(url)
 

@@ -206,6 +206,7 @@ class TestContract(unittest.TestCase):
 class TestClient(unittest.TestCase):
     def setUp(self):
         self.server_url = 'https://test.url/'
+        self.api_path = '/api/downstream/v1'
         self.size = 100
         self.address = base58.b58encode_check(b'\x00'+os.urandom(20))
         self.token = binascii.hexlify(os.urandom(16)).decode('ascii')
@@ -278,7 +279,7 @@ class TestClient(unittest.TestCase):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             patch.return_value.json.return_value = MockValues.connect_response
             self.client.connect()
-        patch.assert_called_with('{0}/api/downstream/new/{1}'.format(self.server_url.strip('/'),self.address))
+        patch.assert_called_with('{0}/new/{1}'.format(self.server_url.strip('/')+self.api_path,self.address))
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
@@ -287,8 +288,8 @@ class TestClient(unittest.TestCase):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             patch.return_value.json.return_value = MockValues.connect_response
             self.client.connect()
-        patch.assert_called_with('{0}/api/downstream/heartbeat/{1}'.format(
-            self.server_url.strip('/'), self.token))
+        patch.assert_called_with('{0}/heartbeat/{1}'.format(
+            self.server_url.strip('/')+self.api_path, self.token))
         self.assertEqual(self.client.token,MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
                          Heartbeat.fromdict(MockValues.connect_response['heartbeat']))
@@ -443,6 +444,7 @@ class TestShell(unittest.TestCase):
         self.test_args = mock.MagicMock()
         self.test_args.number = None
         self.test_args.node_url = 'http://testurl/'
+        self.test_args.api_path = '/api/downstream/v1'
         self.test_args.token = 'testtoken'
         self.test_args.address = 'testaddress'
         self.test_args.size = 100
