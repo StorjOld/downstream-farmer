@@ -268,8 +268,8 @@ class Farmer(object):
                         # token didn't exist on the server... clear token
                         # and try again
                         print('Given token did not exist on remote server. '
-                            'Attempting to obtain a new token.')
-                        client.token = None                        
+                              'Attempting to obtain a new token.')
+                        client.token = None
                         continue
                 if (not reconnect):
                     raise
