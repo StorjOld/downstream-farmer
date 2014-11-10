@@ -59,9 +59,9 @@ class DownstreamContract(object):
 
         # now contract should be expired, we can get a new challenge
 
-        url = '{0}/api/downstream/challenge/{1}/{2}'.format(self.client.server,
-                                                            self.client.token,
-                                                            self.hash)
+        url = '{0}/challenge/{1}/{2}'.format(self.client.api_url,
+                                             self.client.token,
+                                             self.hash)
         try:
             resp = requests.get(url)
         except:
@@ -90,9 +90,9 @@ class DownstreamContract(object):
             # there isn't any point
             return
 
-        url = '{0}/api/downstream/answer/{1}/{2}'.format(self.client.server,
-                                                         self.client.token,
-                                                         self.hash)
+        url = '{0}/answer/{1}/{2}'.format(self.client.api_url,
+                                          self.client.token,
+                                          self.hash)
 
         with io.BytesIO(RandomIO(self.seed).read(self.size)) as f:
             proof = self.client.heartbeat.prove(f, self.challenge, self.tag)

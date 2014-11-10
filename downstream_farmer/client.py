@@ -5,6 +5,7 @@ from __future__ import print_function
 import time
 import binascii
 import hashlib
+import json
 
 import requests
 import heartbeat
@@ -17,14 +18,19 @@ from .contract import DownstreamContract
 heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
                    'Merkle': heartbeat.Merkle.Merkle}
 
+api_prefix = '/api/downstream/v1'
+
 
 class DownstreamClient(object):
 
-    def __init__(self, url, token, address, size):
+    def __init__(self, url, token, address, size, msg, sig):
         self.server = url.strip('/')
+        self.api_url = self.server + api_prefix
         self.token = token
         self.address = address
         self.desired_size = size
+        self.msg = msg
+        self.sig = sig
         self.heartbeat = None
         self.contracts = list()
 
@@ -36,19 +42,32 @@ class DownstreamClient(object):
                 raise DownstreamError(
                     'If no token is specified, address must be.')
             # get a new token
-            url = '{0}/api/downstream/new/{1}'.\
-                format(self.server, self.address)
+            url = '{0}/new/{1}'.\
+                format(self.api_url, self.address)
+            # if we have a message/signature to send, send it
+            if (self.msg != '' and self.sig != ''):
+                data = {
+                    "message": self.msg,
+                    "signature": self.sig
+                }
+                headers = {
+                    'Content-Type': 'application/json'
+                }
+                resp = requests.post(
+                    url, data=json.dumps(data), headers=headers)
+            else:
+                # otherwise, just normal request
+                resp = requests.get(url)
         else:
             # try to use our token
-            url = '{0}/api/downstream/heartbeat/{1}'.\
-                format(self.server, self.token)
+            url = '{0}/heartbeat/{1}'.\
+                format(self.api_url, self.token)
 
-        resp = requests.get(url)
+            resp = requests.get(url)
 
         try:
             r_json = handle_json_response(resp)
         except DownstreamError as ex:
-            # can't handle a connect error.  fail.
             raise DownstreamError('Unable to connect: {0}'.
                                   format(str(ex)))
 
@@ -74,7 +93,7 @@ class DownstreamClient(object):
 
         :param size: the maximum size of the contract, not yet used
         """
-        url = '{0}/api/downstream/chunk/{1}'.format(self.server, self.token)
+        url = '{0}/chunk/{1}'.format(self.api_url, self.token)
 
         resp = requests.get(url)
 

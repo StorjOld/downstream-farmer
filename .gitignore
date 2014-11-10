@@ -47,13 +47,17 @@ coverage.xml
 *.log
 
 # data directory
-data/
+data/*
+!data/identities.json
 
 # Sphinx documentation
 docs/_build/
 
 # PyBuilder
 target/
+
+# PyInstaller
+src/pyinstaller/
 
 # PyCharm/Intellij
 .idea

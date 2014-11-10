@@ -17,7 +17,7 @@
   install:
     - "pip install flake8 coverage coveralls"
     - "pip install -r requirements.txt ."
-    - "git clone -b devel https://github.com/storj/downstream-node.git node"
+    - "git clone https://github.com/storj/downstream-node.git node"
     - "cd node ; pip install -r requirements.txt ."
     - "mkdir data && cd data"
     - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
@@ -30,6 +30,7 @@
     - "cd node"
     - "python runapp.py --initdb"
     - "python runapp.py --whitelist data/whitelist/storj_crowdfunding_by_amount.txt"
+    - 'mysql -e "use downstream; insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
     - "nohup python runapp.py & >/dev/null"
     - "cd .."
   
@@ -40,7 +41,7 @@
   script:
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
-    - "downstream -n 2 -a 1JHz9EDWHXH5oM146QrW8x1mgeyQdmJTcf 'http://localhost:5000'"
+    - "downstream -n 2 'http://localhost:5000'"
 
-  notifications:
-    slack: storj:IwoHonDxA5lauvwcKZRMkfps
+#  notifications:
+#    slack: storj:IwoHonDxA5lauvwcKZRMkfps

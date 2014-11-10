@@ -3,6 +3,7 @@
 ### Master
 
 * [ENHANCEMENT] Switched to changelog methodology
+* [ENHAMCEMENT] Added ability to specify a signature for submission to server for verification of ownership of address
 
 ### v0.1.2
 
