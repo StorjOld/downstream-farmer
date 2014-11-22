@@ -39,16 +39,16 @@ class DownstreamClient(object):
 
     def set_cert_path(self, cert_path):
         """Sets the path of a CA-Bundle to use for verifying requests
-        """        
+        """
         self.cert_path = cert_path
         self._set_requests_verify_arg()
-        
+
     def set_verify_cert(self, verify_cert):
         """Sets whether or not to verify the ssl certificate
         """
         self.verify_cert = verify_cert
         self._set_requests_verify_arg()
-    
+
     def _set_requests_verify_arg(self):
         """Sets the appropriate requests verify argument
         """

@@ -20,7 +20,7 @@ class DownstreamContract(object):
         self.expiration = expiration
         self.tag = tag
         self.client = client
-        self.answered = False        
+        self.answered = False
 
     def time_remaining(self):
         """Returns the amount of time until this challenge
