@@ -34,11 +34,28 @@ class DownstreamClient(object):
         self.heartbeat = None
         self.contracts = list()
         self.cert_path = None
+        self.verify_cert = True
+        self._set_requests_verify_arg()
 
     def set_cert_path(self, cert_path):
         """Sets the path of a CA-Bundle to use for verifying requests
-        """
+        """        
         self.cert_path = cert_path
+        self._set_requests_verify_arg()
+        
+    def set_verify_cert(self, verify_cert):
+        """Sets whether or not to verify the ssl certificate
+        """
+        self.verify_cert = verify_cert
+        self._set_requests_verify_arg()
+    
+    def _set_requests_verify_arg(self):
+        """Sets the appropriate requests verify argument
+        """
+        if (self.verify_cert):
+            self.requests_verify_arg = self.cert_path
+        else:
+            self.requests_verify_arg = False
 
     def connect(self):
         """Connects to a downstream-node server.
@@ -63,16 +80,16 @@ class DownstreamClient(object):
                     url,
                     data=json.dumps(data),
                     headers=headers,
-                    verify=self.cert_path)
+                    verify=self.requests_verify_arg)
             else:
                 # otherwise, just normal request
-                resp = requests.get(url, verify=self.cert_path)
+                resp = requests.get(url, verify=self.requests_verify_arg)
         else:
             # try to use our token
             url = '{0}/heartbeat/{1}'.\
                 format(self.api_url, self.token)
 
-            resp = requests.get(url, verify=self.cert_path)
+            resp = requests.get(url, verify=self.requests_verify_arg)
 
         try:
             r_json = handle_json_response(resp)
@@ -103,8 +120,10 @@ class DownstreamClient(object):
         :param size: the maximum size of the contract, not yet used
         """
         url = '{0}/chunk/{1}'.format(self.api_url, self.token)
+        if (size is not None):
+            url += '/{0}'.format(size)
 
-        resp = requests.get(url, verify=self.cert_path)
+        resp = requests.get(url, verify=self.requests_verify_arg)
 
         try:
             r_json = handle_json_response(resp)
@@ -125,8 +144,6 @@ class DownstreamClient(object):
             self.heartbeat.challenge_type().fromdict(r_json['challenge']),
             datetime.utcnow() + timedelta(seconds=int(r_json['due'])),
             self.heartbeat.tag_type().fromdict(r_json['tag']))
-
-        contract.set_cert_path(self.cert_path)
 
         self.contracts.append(contract)
 

@@ -11,7 +11,7 @@ downstream-farmer
 *Note*: If you are building on OSX, you can install crypto++ using homebrew: `$ brew install cryptopp`.
 
 ```
-$ sudo apt-get install python-dev libcrypto++-dev git python-pip
+$ sudo apt-get install python-dev libcrypto++-dev libgmp-dev git python-pip
 $ git clone https://github.com/Storj/downstream-farmer.git
 $ cd downstream-farmer
 $ pip install -r requirements.txt .

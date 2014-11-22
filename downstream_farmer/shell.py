@@ -94,6 +94,7 @@ class Farmer(object):
         """
 
         self.cert_path = resource_path('ca-bundle.crt')
+        self.verify_cert = not args.ssl_no_verify
 
         self.load_number(args)
 
@@ -250,6 +251,7 @@ class Farmer(object):
             self.size, self.message, self.signature)
 
         client.set_cert_path(self.cert_path)
+        client.set_verify_cert(self.verify_cert)
 
         while (1):
             try:
@@ -353,6 +355,8 @@ def parse_args():
                         .format(identity_path))
     parser.add_argument('-k', '--keepalive', help='Will attempt to reconnect '
                         'upon failure.', action='store_true')
+    parser.add_argument('--ssl-no-verify', help='Do not verify ssl '
+                        'certificates.', action='store_true')
     return parser.parse_args()
 
 

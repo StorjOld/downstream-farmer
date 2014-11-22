@@ -20,13 +20,7 @@ class DownstreamContract(object):
         self.expiration = expiration
         self.tag = tag
         self.client = client
-        self.answered = False
-        self.cert_path = None
-
-    def set_cert_path(self, cert_path):
-        """Sets the path of a CA-Bundle to use for verifying requests
-        """
-        self.cert_path = cert_path
+        self.answered = False        
 
     def time_remaining(self):
         """Returns the amount of time until this challenge
@@ -69,7 +63,7 @@ class DownstreamContract(object):
                                              self.client.token,
                                              self.hash)
         try:
-            resp = requests.get(url, verify=self.cert_path)
+            resp = requests.get(url, verify=self.client.requests_verify_arg)
         except:
             raise DownstreamError('Unable to perform HTTP get.')
 
@@ -114,7 +108,7 @@ class DownstreamContract(object):
             resp = requests.post(url,
                                  data=json.dumps(data),
                                  headers=headers,
-                                 verify=self.cert_path)
+                                 verify=self.client.requests_verify_arg)
         except:
             raise DownstreamError('Unable to perform HTTP post.')
 
