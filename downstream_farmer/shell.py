@@ -363,6 +363,6 @@ def parse_args(args=None):
 def main(cmargs=None):
     for sig in [signal.SIGTERM, signal.SIGINT]:
         signal.signal(sig, handler)
-    
+
     args = parse_args(cmargs)
     eval_args(args)
