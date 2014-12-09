@@ -301,7 +301,7 @@ def eval_args(args):
         fail_exit('Unknown error.')
 
 
-def parse_args():
+def parse_args(args=None):
     history_path = os.path.join('data', 'history.json')
     identity_path = os.path.join('data', 'identities.json')
     default_size = 100
@@ -357,12 +357,12 @@ def parse_args():
                         'upon failure.', action='store_true')
     parser.add_argument('--ssl-no-verify', help='Do not verify ssl '
                         'certificates.', action='store_true')
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
-def main():
+def main(cmargs=None):
     for sig in [signal.SIGTERM, signal.SIGINT]:
         signal.signal(sig, handler)
-
-    args = parse_args()
+    
+    args = parse_args(cmargs)
     eval_args(args)
