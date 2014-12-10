@@ -42,6 +42,7 @@
     - "flake8 downstream_farmer/"
     - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
     - "downstream -n 2 'http://localhost:5000'"
+    - cat node/nohup.out
 
 #  notifications:
 #    slack: storj:IwoHonDxA5lauvwcKZRMkfps
