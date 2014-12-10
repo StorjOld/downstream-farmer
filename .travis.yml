@@ -31,7 +31,7 @@
     - "python runapp.py --initdb"
     - "python runapp.py --whitelist data/whitelist/storj_crowdfunding_by_amount.txt"
     - 'mysql -e "use downstream; insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
-    - "nohup python runapp.py & >/dev/null"
+    - "nohup python runapp.py &"
     - "cd .."
   
   after_success:
