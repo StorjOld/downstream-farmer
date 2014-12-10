@@ -42,6 +42,8 @@ def handle_json_response(resp):
             message = r_json['message']
         except:
             # if not, just raise the regular http error
+            # dump error:
+            print(resp)
             resp.raise_for_status()
         else:
             raise DownstreamError(message)
