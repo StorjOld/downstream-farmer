@@ -1,48 +1,48 @@
----
-  language: python
-  python:
-    - "2.7"
-    - "3.3"
-    - "3.4"
-  # command to install dependencies
+language: python
+python:
+  - 2.7
+  - 3.3
+  - 3.4
+# command to install dependencies
 
-  env: PYTHONPATH="$PWD/node:$PYTHONPATH"
+env: PYTHONPATH="$PWD/node:$PYTHONPATH"
 
-  services:
-    - mysql
+services:
+  - mysql
 
-  before_install:
-    - sudo apt-get install libcrypto++-dev
+before_install:
+  - sudo apt-get install libcrypto++-dev
 
-  install:
-    - "pip install flake8 coverage mock base58 coveralls"
-    - "python setup.py install"
-    - "git clone https://github.com/storj/downstream-node.git node"
-    - "cd node ; pip install -r requirements.txt ."
-    - "mkdir data && cd data"
-    - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
-    - "gunzip GeoLite2-City.mmdb.gz"
-    - "git clone https://github.com/storj/whitelist.git whitelist"
-    - "cd ../.."
+install:
+  - "pip install flake8 coverage mock base58 coveralls"
+  - "python setup.py install"
+  - "git clone https://github.com/storj/downstream-node.git node"
+  - "cd node ; pip install -r requirements.txt ."
+  - "mkdir data && cd data"
+  - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
+  - "gunzip GeoLite2-City.mmdb.gz"
+  - "git clone https://github.com/storj/whitelist.git whitelist"
+  - "cd ../.."
 
-  before_script:
-    - 'mysql -e "create database if not exists downstream;" -u root'
-    - "cd node"
-    - "python runapp.py --initdb"
-    - "python runapp.py --whitelist data/whitelist/storj_crowdfunding_by_amount.txt"
-    - 'mysql -e "use downstream; insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
-    - "nohup python runapp.py &"
-    - "cd .."
+before_script:
+  - 'mysql -e "create database if not exists downstream;" -u root'
+  - "cd node"
+  - "python runapp.py --initdb"
+  - "python runapp.py --whitelist data/whitelist/storj_crowdfunding_by_amount.txt"
+  - 'mysql -e "use downstream; insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
+  - "nohup python runapp.py &"
+  - "cd .."
 
-  after_success:
-    - coveralls
+after_success:
+  - coveralls
 
-  # command to run tests
-  script:
-    - "flake8 downstream_farmer/"
-    - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
-    - "downstream -n 2 'http://localhost:5000'"
-    - cat node/nohup.out
+# command to run tests
+script:
+  - "flake8 downstream_farmer/"
+  - "nosetests -v --with-coverage --cover-package=downstream_farmer tests/"
+  - "downstream -n 2 'http://localhost:5000'"
+  - cat node/nohup.out
 
-#  notifications:
-#    slack: storj:IwoHonDxA5lauvwcKZRMkfps
+notifications:
+  slack:
+    secure: Avmt9x3eMk8f7TpY7OmxvQJTUkpcJjnEZ+aPenh4dO+K6WWmHffK82zK8M+PN5WA7gfffEyPElrfPdMQYNVMmeFzt1S7vu6lvxDh/p/7RnRb3wE6JdpJPngEOf2HFPaFuh9Uqp2zoSleeIHs/n8Qf6HURx5GbzskQ350oWuB06E=
