@@ -19,9 +19,7 @@ homebrew: ``$ brew install cryptopp``.
 ::
 
     $ sudo apt-get install python-dev libcrypto++-dev libgmp-dev git python-pip
-    $ git clone https://github.com/Storj/downstream-farmer.git
-    $ cd downstream-farmer
-    $ pip install -r requirements.txt .
+    $ pip install --process-dependency-links downstream-farmer
 
 To connect to our test node, you must have a whitelisted address and
 provide signed verification of ownership of that address.
