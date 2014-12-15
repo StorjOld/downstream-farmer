@@ -18,7 +18,8 @@ install_requirements = [
 ]
 
 test_requirements = [
-    'base58'
+    'base58',
+    'mock'
 ]
 
 dependencies = [
