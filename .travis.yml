@@ -38,8 +38,8 @@ after_success:
 
 # command to run tests
 script:
-  - "flake8 downstream_farmer/"
   - coverage run setup.py test -a "--doctest-modules --pep8 -v tests/"
+  - coverage report -m --include="downstream_farmer/*"
   - "downstream -n 2 'http://localhost:5000'"
   - cat node/nohup.out
 
