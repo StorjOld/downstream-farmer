@@ -1,9 +1,12 @@
-from setuptools import setup
-#import py2exe
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-with open('downstream_farmer/version.py','r') as f:
+from setuptools import setup
+# import py2exe
+
+with open('downstream_farmer/version.py', 'r') as f:
     exec(f.read())
-    
+
 setup(
     name='downstream-farmer',
     version=__version__,
