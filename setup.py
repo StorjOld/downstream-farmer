@@ -4,7 +4,7 @@
 from setuptools import setup
 # import py2exe
 
-LONG_DESCRIPTION = open('README.md').read()
+LONG_DESCRIPTION = open('README.rst').read()
 
 with open('downstream_farmer/version.py', 'r') as f:
     exec(f.read())
