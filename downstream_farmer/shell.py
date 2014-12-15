@@ -241,7 +241,7 @@ class Farmer(object):
         https://stackoverflow.com/questions/3764291/checking-network-connection
         """
         try:
-            six.moves.urllib.request.urlopen(self.url, timeout=2)
+            six.moves.urllib.request.urlopen(self.url, timeout=5)
         except six.moves.urllib.error.URLError:
             raise DownstreamError("Could not connect to server.")
 
