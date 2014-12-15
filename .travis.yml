@@ -34,7 +34,7 @@ before_script:
   - "cd .."
 
 after_success:
-  - coveralls
+  - "coveralls --verbose"
 
 # command to run tests
 script:
