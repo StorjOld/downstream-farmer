@@ -19,7 +19,10 @@ install_requirements = [
 
 test_requirements = [
     'base58',
-    'mock'
+    'mock',
+    'nose',
+    'coverage',
+    'flake8'
 ]
 
 dependencies = [
