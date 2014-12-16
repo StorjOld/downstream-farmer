@@ -69,6 +69,7 @@ setup(
     install_requires=install_requirements,
     tests_require=test_requirements,
     dependency_links=dependencies,
+    include_package_data=True,
     entry_points={
         'console_scripts': [
             'downstream = downstream_farmer.shell:main'
