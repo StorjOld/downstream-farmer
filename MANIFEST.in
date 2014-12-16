@@ -1,1 +1,2 @@
 include LICENSE
+include downstream_farmer/data/*
