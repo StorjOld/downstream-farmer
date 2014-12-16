@@ -4,7 +4,6 @@
 
 import six
 import os
-import sys
 
 from .exc import DownstreamError
 
@@ -54,8 +53,5 @@ def handle_json_response(resp):
     return r_json
 
 
-# stolen and adpated from <http://stackoverflow.com/questions/7674790/bundling-data-files-with-pyinstaller-onefile>  # NOQA
-# and <https://github.com/kennethreitz/requests/issues/557>
 def resource_path(relative):
-    return os.path.join(getattr(sys, '_MEIPASS', os.path.abspath("data")),
-                        relative)
+    return os.path.join(os.path.dirname(__file__), 'data', relative)
