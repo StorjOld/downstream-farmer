@@ -4,6 +4,7 @@
 
 import six
 import os
+import sys
 
 from .exc import DownstreamError
 
@@ -54,4 +55,5 @@ def handle_json_response(resp):
 
 
 def resource_path(relative):
-    return os.path.join(os.path.dirname(__file__), 'data', relative)
+    return os.path.join(getattr(sys, '_MEIPASS', os.path.join(os.path.dirname(__file__), 'data')),
+                        relative)

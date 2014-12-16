@@ -1,12 +1,10 @@
 # -*- mode: python -*-
-import os
-
 a = Analysis(['downstream.py'],
              pathex=['.'],
              hiddenimports=[],
              hookspath=None,
              runtime_hooks=None)
-a.datas += [('ca-bundle.crt',os.path.join('data','ca-bundle.crt'),'DATA')]
+a.datas += [('ca-bundle.crt',os.path.join('downstream_farmer','data','ca-bundle.crt'),'DATA')]
 pyz = PYZ(a.pure)
 exe = EXE(pyz,
           a.scripts,
