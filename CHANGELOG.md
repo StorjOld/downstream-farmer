@@ -2,7 +2,10 @@
 
 ### Master
 
+### v0.1.4
+
 * [REBASE] Removed 32MB test file from far back in the history. Recommended to re-clone the repository.
+* [ENHANCEMENT] Added --no-ssl-verify tag to prevent verification of ssl certificates
 
 ### v0.1.3
 
