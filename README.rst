@@ -25,6 +25,7 @@ You can install and use ``downstream-farmer`` on all major operating systems:
 **OSX**
 
 ::
+
     $ brew tap storj/storj
     $ brew install downstream-farmer
 
