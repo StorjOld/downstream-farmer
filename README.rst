@@ -29,7 +29,7 @@ You can install and use ``downstream-farmer`` on all major operating systems:
     $ brew tap storj/storj
     $ brew install downstream-farmer
 
-After adding the `storj/storj` tap, you can use `brew info downstream-farmer` at any time to see usage information.
+After adding the ``storj/storj`` tap, you can use ``brew info downstream-farmer`` at any time to see usage information.
 
 **Windows**
 
