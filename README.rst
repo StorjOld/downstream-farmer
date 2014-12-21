@@ -22,6 +22,8 @@ You can install and use ``downstream-farmer`` on all major operating systems:
     $ sudo apt-get install python-dev libcrypto++-dev libgmp-dev git python-pip
     $ pip install --process-dependency-links downstream-farmer
 
+It is recommended to run your `pip install` inside a Python virtual environment to prevent potential conflicts with your system Python and packages.
+
 **OSX**
 
 ::
