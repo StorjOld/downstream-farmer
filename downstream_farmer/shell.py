@@ -123,7 +123,7 @@ class Farmer(object):
             print('Using token {0}'.format(self.token))
 
         if (self.address is not None):
-            print('Farming on address {0}'.format(self.address))\
+            print('Farming on address {0}'.format(self.address))
 
 
     def load_number(self, args):
