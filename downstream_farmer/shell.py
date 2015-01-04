@@ -219,7 +219,7 @@ class Farmer(object):
                     '      "your sjcx address": {{\n'
                     '         "message": "your message here",\n'
                     '         "signature":  "base64 signature from bitcoin '
-                    'wallet or counterparty",\n'
+                    'wallet or counterwallet",\n'
                     '      }}\n'
                     '   }}'.format(self.identity_path))
             self.message = self.identities[self.address]['message']
@@ -347,7 +347,7 @@ def parse_args(args=None):
                         '   "your sjcx address": {{\n'
                         '      "message": "your message here",\n'
                         '      "signature": "base64 signature from bitcoin\\\n'
-                        '                     wallet or counterparty",\n'
+                        '                     wallet or counterwallet",\n'
                         '   }}\n'
                         '}}\n'
                         'If an identity is specified in this file, it will '
