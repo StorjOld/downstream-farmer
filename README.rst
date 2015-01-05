@@ -13,13 +13,29 @@ requires MySQL and a working config, but *this app*,
 ``downstream-farmer``, will require python-dev and libcrypto++-dev to
 install from source.
 
-*Note*: If you are building on OSX, you can install crypto++ using
-homebrew: ``$ brew install cryptopp``.
+You can install and use ``downstream-farmer`` on all major operating systems:
+
+**Ubuntu** 
 
 ::
 
     $ sudo apt-get install python-dev libcrypto++-dev libgmp-dev git python-pip
     $ pip install --process-dependency-links downstream-farmer
+
+It is recommended to run your `pip install` inside a Python virtual environment to prevent potential conflicts with your system Python and packages.
+
+**OSX**
+
+::
+
+    $ brew tap storj/storj
+    $ brew install downstream-farmer
+
+After adding the ``storj/storj`` tap, you can use ``brew info downstream-farmer`` at any time to see usage information.
+
+**Windows**
+
+Use the binaries available `here <https://github.com/Storj/downstream-farmer/releases>`_.
 
 To connect to our test node, you must have a whitelisted address and
 provide signed verification of ownership of that address.

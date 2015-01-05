@@ -736,7 +736,7 @@ class TestShell(unittest.TestCase):
                              '      "your sjcx address": {{\n'
                              '         "message": "your message here",\n'
                              '         "signature":  "base64 signature from '
-                             'bitcoin wallet or counterparty",\n'
+                             'bitcoin wallet or counterwallet",\n'
                              '      }}\n'
                              '   }}'.format(self.test_args.identity))
 
