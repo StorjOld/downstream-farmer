@@ -158,37 +158,7 @@ class DownstreamContract(object):
 
         if (r_json['status'] != 'ok'):
             raise DownstreamError('Challenge response rejected.')
-
+            
         self.answered = True
-        
-    def run(self, number=None):
-        """Runs this contract to completion
-        """
-        i = 0
-        while (self.thread_manager.running and (number is None or i < number)):
-            i += 1
-            
-            time_to_wait = self.time_remaining()
-            
-            if (time_to_wait > 0):
-                self.thread_manager.sleep(time_to_wait + 2)
-            
-            # update the challenge.  don't block if for any reason
-            # we would (which we shouldn't anyway)
-            try:
-                self.update_challenge(False)
-            except DownstreamError as ex:
-                # challenge update failed, contract is done
-                print('Challenge update failed: {0}\nDropping contract {1}'.
-                      format(str(ex), self.hash))
-                return
 
-            # answer the challenge
-            try:
-                self.answer_challenge()
-            except DownstreamError as ex:
-                # challenge answer failed, remove this contract
-                print('Challenge answer failed: {0}, dropping contract {1}'.
-                      format(str(ex), self.hash))
-                return
             

@@ -133,6 +133,13 @@ class ThreadManager(object):
             t.wake()
     
     def sleep(self, timeout):
+        """Calls the wait function on the current ManagedThread
+        Should be called from within a managed thread.
+        Use this instead of time.sleep() so that the managed thread
+        can be awoken and shutdown
+        :param timeout: the timeout for the sleep.  If none, will sleep
+        indefinitely
+        """
         if (self.running):
             threading.current_thread().wait(timeout)
 
@@ -148,15 +155,15 @@ class ThreadManager(object):
         self.signal_shutdown()
         # wait for child threads to shut down
         for t in self.threads:
-            t.join()
+            if (t.is_alive()):
+                t.join()
         self.threads = list()
         
     def _child_wrapper(self, target=None, args=(), kwargs={}):
         try:
             target(*args, **kwargs)
         except:
-            print('Unhandled exception: {0}'.format(sys.exc_info()[1]))
-            traceback.print_tb(sys.exc_info()[2])
+            traceback.print_exc()
             self.signal_shutdown()
     
     def create_thread(self, target=None, args=(), kwargs={}):        
@@ -200,15 +207,24 @@ class ShellApplication(ThreadManager):
         self.signal_shutdown()
 
 class WorkChunk(object):
+    """Encapsulates a chunk of work for the load tracker
+    """
     def __init__(self, start, end):
         self.start = start
         self.end = end
     
     @property
     def elapsed(self):
+        """The elapsed time for the chunk
+        """
         return self.end - self.start
         
     def elapsed_from_start(self, start):
+        """Time elapsed in the work chunk, given a start time
+        Ensures that the chunk work cannot start any earlier than 
+        the specified start time.
+        :param start: the earliest time to calculate the elapsed time from
+        """
         if (self.start < start):
             return self.end - start
         else:
@@ -216,7 +232,7 @@ class WorkChunk(object):
 
 class LoadTracker(object):
     def __init__(self, sample_time=60):
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.work_chunks = deque()
         self.current_work_start = None
         self.sample_time = sample_time
@@ -231,9 +247,10 @@ class LoadTracker(object):
     
     def _trim(self):
         # trim work chunks
-        while (len(self.work_chunks) > 0 and 
-                self.work_chunks[0].end < self.sample_start):
-            self.work_chunks.popleft()
+        with self.lock:
+            while (len(self.work_chunks) > 0 and 
+                    self.work_chunks[0].end < self.sample_start):
+                self.work_chunks.popleft()
     
     def start_work(self):
         with self.lock:
