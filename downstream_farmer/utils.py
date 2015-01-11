@@ -67,7 +67,7 @@ def resource_path(relative):
                 os.path.join(os.path.dirname(__file__), 'data')),
         relative)
 
-        
+
 def save(path, obj):
     """saves the farmer state to disk
 
@@ -98,30 +98,33 @@ def restore(path):
     else:
         return dict()
 
+
 class ManagedThread(threading.Thread):
+
     def __init__(self, target=None, name=None, args=(), kwargs={}):
         """Initializes the managed thread
-        
+
         A managed thread basically has an attached event which can awake
         that thread from sleeping.
         """
         threading.Thread.__init__(self, None, target, name, args, kwargs)
         self.daemon = True
         self.attached_event = threading.Event()
-    
+
     def wait(self, timeout=None):
         self.attached_event.wait(timeout)
         self.attached_event.clear()
-        
+
     def wake(self):
         self.attached_event.set()
 
-        
+
 class ThreadManager(object):
+
     def __init__(self):
         self.threads = list()
         self.shutting_down = threading.Event()
-    
+
     def signal_shutdown(self):
         """Can be called from any thread, signals for a shutdown to occur.
         """
@@ -131,7 +134,7 @@ class ThreadManager(object):
         # wake all the child thread if they are waiting on a signal
         for t in self.threads:
             t.wake()
-    
+
     def sleep(self, timeout):
         """Calls the wait function on the current ManagedThread
         Should be called from within a managed thread.
@@ -146,7 +149,7 @@ class ThreadManager(object):
     @property
     def running(self):
         return not self.shutting_down.is_set()
-    
+
     def finish(self):
         """Signals for a shutdown and waits for child
         threads to exit
@@ -158,19 +161,20 @@ class ThreadManager(object):
             if (t.is_alive()):
                 t.join()
         self.threads = list()
-        
+
     def _child_wrapper(self, target=None, args=(), kwargs={}):
         try:
             target(*args, **kwargs)
         except:
             traceback.print_exc()
             self.signal_shutdown()
-    
-    def create_thread(self, target=None, args=(), kwargs={}):        
-        thread = ManagedThread(target=self._child_wrapper, args=(target, args, kwargs))
+
+    def create_thread(self, target=None, args=(), kwargs={}):
+        thread = ManagedThread(
+            target=self._child_wrapper, args=(target, args, kwargs))
         self.threads.append(thread)
         return thread
-    
+
     def wait_for_shutdown(self):
         """Waits for a shutdown signal from the child threads
         Should be run from the main thread
@@ -183,13 +187,14 @@ class ThreadManager(object):
             # send a kill signal when they fail
             try:
                 time.sleep(1)
-            except InterruptedError:
+            except:
                 # when interrupted this sleep will raise the interrupted error
                 pass
         self.finish()
 
-        
+
 class ShellApplication(ThreadManager):
+
     def __init__(self):
         """Initializes the shell application by registering some signals
         Must be called from the main thread
@@ -199,29 +204,32 @@ class ShellApplication(ThreadManager):
         # register signals with application
         for sig in [signal.SIGTERM, signal.SIGINT]:
             signal.signal(sig, self.signal_handler)
-    
+
     def signal_handler(self, signum=None, frame=None):
         """When called, exits the shell application.  Calls the shutdown
         function
         """
         self.signal_shutdown()
 
+
 class WorkChunk(object):
+
     """Encapsulates a chunk of work for the load tracker
     """
+
     def __init__(self, start, end):
         self.start = start
         self.end = end
-    
+
     @property
     def elapsed(self):
         """The elapsed time for the chunk
         """
         return self.end - self.start
-        
+
     def elapsed_from_start(self, start):
         """Time elapsed in the work chunk, given a start time
-        Ensures that the chunk work cannot start any earlier than 
+        Ensures that the chunk work cannot start any earlier than
         the specified start time.
         :param start: the earliest time to calculate the elapsed time from
         """
@@ -230,41 +238,44 @@ class WorkChunk(object):
         else:
             return self.elapsed
 
+
 class LoadTracker(object):
+
     def __init__(self, sample_time=60):
         self.lock = threading.RLock()
         self.work_chunks = deque()
         self.current_work_start = None
         self.sample_time = sample_time
         self.start = time.time()
-    
+
     @property
     def sample_start(self):
         sample_start = time.time() - self.sample_time
         if (sample_start < self.start):
             sample_start = self.start
         return sample_start
-    
+
     def _trim(self):
         # trim work chunks
         with self.lock:
-            while (len(self.work_chunks) > 0 and 
+            while (len(self.work_chunks) > 0 and
                     self.work_chunks[0].end < self.sample_start):
                 self.work_chunks.popleft()
-    
+
     def start_work(self):
         with self.lock:
             self.current_work_start = time.time()
-    
+
     def finish_work(self):
         with self.lock:
             if (self.current_work_start is None):
-                raise RuntimeError('Load tracker work chunk must be started before'
-                                   ' it can be finished.')
-            self.work_chunks.append(WorkChunk(self.current_work_start, time.time()))
+                raise RuntimeError('Load tracker work chunk must be started '
+                                   'before it can be finished.')
+            self.work_chunks.append(
+                WorkChunk(self.current_work_start, time.time()))
             self.current_work_start = None
             self._trim()
-    
+
     def work_time(self):
         with self.lock:
             self._trim()
@@ -278,9 +289,9 @@ class LoadTracker(object):
                                         time.time()).\
                     elapsed_from_start(sample_start)
         return work_total
-    
+
     def total_time(self):
         return time.time() - self.sample_start
-        
+
     def load(self):
         return self.work_time() / self.total_time()

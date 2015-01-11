@@ -1,6 +1,4 @@
-import io
 import json
-import time
 import os
 
 from datetime import datetime, timedelta
@@ -13,14 +11,14 @@ from .exc import DownstreamError
 
 class DownstreamContract(object):
 
-    def __init__(self, 
-                 client, 
-                 hash, 
-                 seed, 
-                 size, 
-                 challenge, 
-                 expiration, 
-                 tag, 
+    def __init__(self,
+                 client,
+                 hash,
+                 seed,
+                 size,
+                 challenge,
+                 expiration,
+                 tag,
                  manager,
                  chunk_dir):
         self.hash = hash
@@ -33,24 +31,24 @@ class DownstreamContract(object):
         self.client = client
         self.answered = False
         self.thread_manager = manager
-        self.path = os.path.join(chunk_dir,self.hash)
-    
+        self.path = os.path.join(chunk_dir, self.hash)
+
     def __repr__(self):
         return self.hash
-     
+
     def generate_data(self):
         RandomIO(self.seed).genfile(self.size, self.path)
-    
+
     def cleanup_data(self):
         if (os.path.isfile(self.path)):
             os.remove(self.path)
-    
+
     def __enter__(self):
         self.generate_data()
-        
+
     def __exit__(self, type, value, traceback):
         self.cleanup_data()
-        
+
     def time_remaining(self):
         """Returns the amount of time until this challenge
         is ready to be updated.
@@ -104,8 +102,9 @@ class DownstreamContract(object):
             raise DownstreamError('Challenge update failed.')
 
         if ('status' in r_json and r_json['status'] == 'no more challenges'):
-            raise DownstreamError('No more challenges for contract {0}'.format(self.hash))
-            
+            raise DownstreamError(
+                'No more challenges for contract {0}'.format(self.hash))
+
         for k in ['challenge', 'due', 'answered']:
             if (k not in r_json):
                 raise DownstreamError('Malformed response from server.')
@@ -129,7 +128,7 @@ class DownstreamContract(object):
                                           self.hash)
 
         # ok now we will read from file
-        with open(self.path, 'rb') as f:                    
+        with open(self.path, 'rb') as f:
             proof = self.client.heartbeat.prove(f, self.challenge, self.tag)
 
         data = {
@@ -158,7 +157,5 @@ class DownstreamContract(object):
 
         if (r_json['status'] != 'ok'):
             raise DownstreamError('Challenge response rejected.')
-            
-        self.answered = True
 
-            
+        self.answered = True

@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import os
 import sys
-import time
 import binascii
 import hashlib
 import json
@@ -24,7 +23,9 @@ heartbeat_types = {'Swizzle': heartbeat.Swizzle.Swizzle,
 
 api_prefix = '/api/downstream/v1'
 
+
 class ContractPool(object):
+
     def __init__(self, manager, contract_thread, wake_ct_on_hb=False):
         self.contracts = list()
         self.contracts_lock = threading.Lock()
@@ -36,16 +37,16 @@ class ContractPool(object):
         self.id = binascii.hexlify(os.urandom(4)).decode()
         self.heartbeat_count = 0
         self.wake_ct_on_hb = wake_ct_on_hb
-    
+
     def __del__(self):
         self.remove_all_contracts()
-    
+
     def __repr__(self):
         return self.id
-    
+
     def start(self):
         self.thread.start()
-    
+
     def get_total_size(self):
         """Returns the total size of all the current contracts
         """
@@ -58,37 +59,37 @@ class ContractPool(object):
     def contract_count(self):
         with self.contracts_lock:
             return len(self.contracts)
-                
+
     def get_average_load(self):
         """Reutrns the loading of this thread
         :returns: the percent load (work time / total time)
         """
         return self.load_tracker.load()
-    
+
     def add_contract(self, contract):
         """This starts the specified contract
         :param contract: contract to run
-        """        
+        """
         contract.generate_data()
         with self.contracts_lock:
             self.contracts.append(contract)
         # wake up the thread
         self.thread.wake()
-    
+
     def remove_contract(self, contract):
         with self.contracts_lock:
             self.contracts.remove(contract)
-        # wake up the contract manager thread in order to get more 
+        # wake up the contract manager thread in order to get more
         # contracts if necessary
         self.contract_thread.wake()
         contract.cleanup_data()
-        
+
     def remove_all_contracts(self):
         with self.contracts_lock:
             for c in self.contracts:
                 c.cleanup_data()
             self.contracts = list()
-    
+
     def get_next_contract(self):
         """Finds the next contract to update and answer based on
         time til expiration
@@ -102,7 +103,7 @@ class ContractPool(object):
                     next_contract = c
                     least_time = time_on_this_contract
         return next_contract
-        
+
     def _run_challenge_response_loop(self):
         self.load_tracker.start_work()
         while (self.thread_manager.running):
@@ -114,30 +115,30 @@ class ContractPool(object):
                     continue
 
                 time_to_wait = next_contract.time_remaining()
-                
-                if (time_to_wait > 0):                    
+
+                if (time_to_wait > 0):
                     self.load_tracker.finish_work()
-                    # print('Contact pool {0} is loaded at {1}%'.format(self, round(self.get_average_load()*100,2)))
                     self.thread.wait(time_to_wait + 2)
                     self.load_tracker.start_work()
                     continue
-                
+
                 try:
                     # update the challenge.  don't block if for any reason
                     # we would (which we shouldn't anyway)
                     next_contract.update_challenge(False)
-                    
+
                     # answer the challenge
                     next_contract.answer_challenge()
-                    
+
                     self.heartbeat_count += 1
-                    
+
                     if (self.wake_ct_on_hb):
                         self.contract_thread.wake()
 
                 except DownstreamError as ex:
                     # challenge answer failed, remove this contract
-                    print('Challenge update/answer failed: {0}, dropping contract {1}'.
+                    print('Challenge update/answer failed: {0}, '
+                          'dropping contract {1}'.
                           format(str(ex), next_contract.hash))
 
                     self.remove_contract(next_contract)
@@ -152,14 +153,14 @@ class ContractPool(object):
 
 class DownstreamClient(object):
 
-    def __init__(self, 
-                 url, 
-                 token, 
-                 address, 
-                 size, 
-                 msg, 
-                 sig, 
-                 manager, 
+    def __init__(self,
+                 url,
+                 token,
+                 address,
+                 size,
+                 msg,
+                 sig,
+                 manager,
                  chunk_dir):
         self.server = url.strip('/')
         self.api_url = self.server + api_prefix
@@ -175,11 +176,11 @@ class DownstreamClient(object):
         self.contract_thread = None
         self.cert_path = None
         self.verify_cert = True
-        self.running = True        
+        self.running = True
         self.thread_manager = manager
         self.chunk_dir = chunk_dir
         self._set_requests_verify_arg()
-    
+
     def __del__(self):
         self._remove_all_contracts()
 
@@ -280,7 +281,7 @@ class DownstreamClient(object):
 
         if ('status' in r_json and r_json['status'] == 'no chunks available'):
             raise DownstreamError('No chunks available.')
-                                  
+
         for k in ['file_hash', 'seed', 'size', 'challenge', 'tag', 'due']:
             if (k not in r_json):
                 raise DownstreamError('Malformed response from server.')
@@ -288,7 +289,7 @@ class DownstreamClient(object):
         # perform a size check
         if (self.get_total_size() + r_json['size'] > self.desired_size):
             raise DownstreamError('Server sent excessively sized chunk.')
-                
+
         contract = DownstreamContract(
             self,
             r_json['file_hash'],
@@ -299,7 +300,7 @@ class DownstreamClient(object):
             self.heartbeat.tag_type().fromdict(r_json['tag']),
             self.thread_manager,
             self.chunk_dir)
-        
+
         return contract
 
     def get_total_size(self):
@@ -310,21 +311,21 @@ class DownstreamClient(object):
             for c in self.contract_pools:
                 total += c.get_total_size()
         return total
-    
+
     def contract_count(self):
         count = 0
         with self.contract_pools_lock:
             for c in self.contract_pools:
                 count += c.contract_count()
         return count
-        
+
     def heartbeat_count(self):
         count = 0
         with self.contract_pools_lock:
             for c in self.contract_pools:
                 count += c.heartbeat_count
         return count
-        
+
     def _add_contract(self, contract, wake_on_hb=False):
         """Used internally to add a contract to the client.
         Finds a contract pool to add the contract to, or if
@@ -338,17 +339,19 @@ class DownstreamClient(object):
         candidate_pools = dict()
         for p in self.contract_pools:
             load = p.get_average_load()
-            #print('Contract pool {0} is loaded at {1}%'.format(p, round(load*100, 2)))
+            # print('Contract pool {0} is loaded at {1}%'
+            #       .format(p, round(load*100, 2)))
             if (load < 0.5):
                 candidate_pools[load] = p
-        
+
         if (len(candidate_pools) > 0):
             p = candidate_pools[min(candidate_pools.keys())]
-            #print('Adding new contract {0} to contract pool {1}'.format(contract, p))
+            # print('Adding new contract {0} to contract pool {1}'
+            #       .format(contract, p))
             p.add_contract(contract)
         else:
             # start a new thread
-            contract_pool = ContractPool(self.thread_manager, 
+            contract_pool = ContractPool(self.thread_manager,
                                          self.contract_thread,
                                          wake_on_hb)
             self.contract_pools.append(contract_pool)
@@ -356,38 +359,44 @@ class DownstreamClient(object):
                 len(self.contract_pools)))
             contract_pool.start()
             contract_pool.add_contract(contract)
-        
+
     def _remove_all_contracts(self):
         with self.contract_pools_lock:
             for c in self.contract_pools:
                 c.remove_all_contracts()
             self.contract_pools = list()
-                
+
     def _run_contract_manager(self, retry=False, number=None):
         """This loop will maintain the desired total contract size, if
         possible
         :param retry: whether to retry if unable to obtain any contracts
         :param number: the number of challenges to answer (for each contract)
             it will perform at least this number of heartbeats and then exit,
-            but it may perform more heartbeats depending on the size of the 
+            but it may perform more heartbeats depending on the size of the
             requested contracts
         """
         online_already = False
         # we want to wake up on every heart beat in order to check if we have
         # reached our heartbeat goal.  otherwise, don't worry about it
         wake_on_hb = (True if number is not None else False)
-        
+
         while (self.thread_manager.running):
             # first attempts to obtain the full contract size
             try:
-                while (self.thread_manager.running and self.get_total_size() < self.desired_size):
+                while (self.thread_manager.running
+                       and self.get_total_size() < self.desired_size):
                     print('Contracts: {0}, Total size: {1}/{2}'.
-                          format(self.contract_count(), self.get_total_size(), self.desired_size))
+                          format(self.contract_count(),
+                                 self.get_total_size(),
+                                 self.desired_size))
                     size_to_fill = self.desired_size - self.get_total_size()
                     contract = self.get_contract(size_to_fill)
-                    print('Obtained contract {0}... for {1} bytes'.format(contract.hash[:8], contract.size))
+                    print('Obtained contract {0}... for {1} bytes'.format(
+                        contract.hash[:8], contract.size))
                     self._add_contract(contract, wake_on_hb)
-                    print('Capacity filled {0}%'.format(round(self.get_total_size()/self.desired_size*100,2)))
+                    print('Capacity filled {0}%'.format(
+                        round(self.get_total_size() /
+                              self.desired_size * 100, 2)))
             except DownstreamError as ex:
                 if (self.contract_count() == 0):
                     print('Unable to obtain a contract: {0}'.format(str(ex)))
@@ -406,16 +415,16 @@ class DownstreamClient(object):
                 print('Your farmer is online.')
                 online_already = True
             self.contract_thread.wait(30)
-            
+
             if (number is not None and self.heartbeat_count() >= number):
                 # signal a shutdown, and return
                 print('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
                 return
-                
+
     def run_async(self, retry=False, number=None):
         """Starts the contract management loop
-        
+
         :param retry: whether to retry on obtaining a contract upon failure
         :param number: the number of challenges to answer
         """

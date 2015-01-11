@@ -1,6 +1,3 @@
-
-import json
-import time
 import siggy
 import os
 import six
@@ -8,6 +5,7 @@ import sys
 from .utils import resource_path, restore, save, ShellApplication
 from .client import DownstreamClient
 from .exc import DownstreamError
+
 
 class Farmer(ShellApplication):
 
@@ -32,7 +30,7 @@ class Farmer(ShellApplication):
         :param args: the arguments from the command line
         """
         ShellApplication.__init__(self)
-        
+
         self.cert_path = resource_path('ca-bundle.crt')
         self.verify_cert = not args.ssl_no_verify
 
@@ -68,12 +66,15 @@ class Farmer(ShellApplication):
             print('Farming on address {0}'.format(self.address))
 
     def prepare_chunk_dir(self):
-        try:            
+        try:
             if (not os.path.isdir(self.chunk_dir)):
-                print('Creating directory {0}'.format(os.path.abspath(self.chunk_dir)))
+                print('Creating directory {0}'.format(
+                    os.path.abspath(self.chunk_dir)))
                 os.mkdir(self.chunk_dir)
         except:
-            raise DownstreamError('Chunk directory could not be created: {0}'.format(sys.exc_info()[1]))
+            raise DownstreamError(
+                'Chunk directory could not be created: {0}'.
+                format(sys.exc_info()[1]))
 
     def load_number(self, args):
         """Loads the number of challenges from the command line
@@ -202,7 +203,7 @@ class Farmer(ShellApplication):
 
         self.client.set_cert_path(self.cert_path)
         self.client.set_verify_cert(self.verify_cert)
-        
+
         try:
             self.client.connect()
         except DownstreamError as ex:
@@ -215,7 +216,7 @@ class Farmer(ShellApplication):
                 self.client.connect()
             else:
                 raise
-                    
+
         # connection successful, save our state, then begin farming
         self.state.setdefault('nodes', dict())[self.client.server] = {
             'token': self.client.token,
@@ -225,5 +226,5 @@ class Farmer(ShellApplication):
         save(self.history_path, self.state)
 
         self.client.run_async(reconnect, self.number)
-        
+
         self.wait_for_shutdown()

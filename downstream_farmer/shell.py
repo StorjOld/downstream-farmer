@@ -10,8 +10,6 @@ from .version import __version__
 from .exc import DownstreamError
 from .farmer import Farmer
 
-import six
-
 
 class SmartFormatter(argparse.HelpFormatter):
 
@@ -33,7 +31,7 @@ def fail_exit(msg, exit_code=1):
 def eval_args(args):
     try:
         farmer = Farmer(args)
-        
+
         farmer.run(args.keepalive)
 
     except DownstreamError as e:
