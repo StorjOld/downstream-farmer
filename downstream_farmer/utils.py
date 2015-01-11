@@ -10,7 +10,6 @@ import signal
 import json
 import threading
 import time
-from __future__ import division
 
 from collections import deque
 
@@ -295,4 +294,4 @@ class LoadTracker(object):
         return time.time() - self.sample_start
 
     def load(self):
-        return self.work_time() / self.total_time()
+        return float(self.work_time()) / float(self.total_time())
