@@ -169,6 +169,16 @@ class TestThreadManager(unittest.TestCase):
             s.side_effect = MockTargetGenerator(self.thread_manager)
             self.thread_manager.wait_for_shutdown()
         self.assertFalse(self.thread_manager.running)
+        
+    def test_child_exception(self):
+        def mock_target():
+            raise Exception('test error')
+        
+        thread = self.thread_manager.create_thread(
+            target=mock_target)
+        thread.start()
+        self.thread_manager.wait_for_shutdown()
+        self.assertFalse(self.thread_manager.running)
 
 
 class TestShellApplication(unittest.TestCase):
@@ -866,6 +876,14 @@ class MockShutdownAndRaise(MockContractShutdown):
         raise self.exception
 
 
+class MockContractWait(object):
+    def __init__(self, contract):
+        self.contract = contract
+        
+    def __call__(self, arg=None):
+        self.contract.time_remaining.return_value = 0
+
+        
 class TestContractPool(unittest.TestCase):
 
     def setUp(self):
@@ -875,10 +893,21 @@ class TestContractPool(unittest.TestCase):
                                           self.contract_thread)
 
     def tearDown(self):
-        del self.contract_pool
+        self.contract_pool.remove_all_contracts()
 
     def test_init(self):
         self.assertEqual(len(self.contract_pool.contracts), 0)
+        
+    def test_delete(self):
+        pool = ContractPool(self.manager,
+                            self.contract_thread)
+        
+        mock_remove_all = mock.MagicMock()
+        pool.remove_all_contracts = mock_remove_all
+        
+        pool.__del__()
+        
+        self.assertTrue(mock_remove_all.called)
 
     def test_repr(self):
         self.assertEqual(str(self.contract_pool), self.contract_pool.id)
@@ -957,6 +986,12 @@ class TestContractPool(unittest.TestCase):
         self.contract0.update_challenge.assert_called_with(False)
         self.assertTrue(self.contract0.answer_challenge.called)
 
+    def add_waitable_contract(self):
+        self.contract1 = mock.MagicMock()
+        self.contract1.size = 100
+        self.contract1.time_remaining.return_value = 1
+        self.contract_pool.add_contract(self.contract1)
+        
     def test_run_challenge_response_loop_no_contracts_wait(self):
         self.mock_thread_manager()
 
@@ -968,6 +1003,24 @@ class TestContractPool(unittest.TestCase):
         self.contract_pool._run_challenge_response_loop()
 
         self.assertTrue(self.contract_pool.thread.wait.called)
+     
+    def test_run_challenge_response_loop_next_contract_wait(self):
+        self.add_waitable_contract()
+        self.contract_pool.wake_ct_on_hb = True
+        self.mock_thread_manager()
+        self.contract_pool.thread = mock.MagicMock()
+        
+        self.contract_pool.thread.wait.side_effect = \
+            MockContractWait(self.contract1)
+        
+        self.contract_pool.contract_thread = mock.MagicMock()
+        
+        self.contract_pool.contract_thread.wake.side_effect = \
+            MockContractShutdown(self.contract_pool.thread_manager)
+        
+        self.contract_pool._run_challenge_response_loop()
+        
+        self.contract_pool.thread.wait.assert_called_with(3)
 
     def test_run_challenge_response_loop_update_failed(self):
         self.add_due_contract()
@@ -996,6 +1049,17 @@ class TestContractPool(unittest.TestCase):
         # contract should have been removed
 
         self.assertEqual(self.contract_pool.contract_count(), 0)
+        
+    def test_run_challenge_response_loop_unexpected_error(self):
+        self.contract_pool.get_next_contract = mock.MagicMock()
+        self.contract_pool.get_next_contract.side_effect = Exception('test error')
+        self.contract_pool.remove_all_contracts = mock.MagicMock()
+        self.contract_pool.thread_manager = mock.MagicMock()
+        
+        self.contract_pool._run_challenge_response_loop()
+        
+        self.assertTrue(self.contract_pool.remove_all_contracts.called)
+        self.assertTrue(self.contract_pool.thread_manager.signal_shutdown.called)
 
 
 class AddContractMock(object):
@@ -1061,6 +1125,11 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.desired_size, self.size)
         self.assertIsNone(self.client.heartbeat)
         self.assertEqual(len(self.client.contract_pools), 0)
+        
+    def test_delete(self):
+        self.client._remove_all_contracts = mock.MagicMock()
+        self.client.__del__()
+        self.assertTrue(self.client._remove_all_contracts.called)
 
     def test_connect_no_token_no_address(self):
         self.client.address = None
@@ -1176,7 +1245,7 @@ class TestClient(unittest.TestCase):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
             inst.json.return_value = MockValues.get_chunk_response
-            contract = self.client.get_contract()
+            contract = self.client.get_contract(100)
         self.assertEqual(
             contract.hash, self.test_contract.hash)
         self.assertEqual(
@@ -1189,6 +1258,29 @@ class TestClient(unittest.TestCase):
                                 self.test_contract.expiration)
                                .total_seconds(), 0, delta=1)
         self.assertEqual(contract.tag, self.test_contract.tag)
+        
+    def test_get_contract_no_chunks_available(self):
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.get'),\
+                mock.patch(
+                'downstream_farmer.client.handle_json_response'
+                ) as hpatch:
+            hpatch.return_value = dict(status='no chunks available')
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.get_contract()
+        self.assertEqual(str(ex.exception), 'No chunks available.')
+    
+    def test_get_contract_excessively_sized_chunk(self):
+        self.client.heartbeat = self.test_heartbeat
+        with mock.patch('downstream_farmer.client.requests.get') as patch:
+            inst = patch.return_value
+            inst.json.return_value = MockValues.get_chunk_response
+            inst.json.return_value['size'] = 1000
+            with self.assertRaises(DownstreamError) as ex:
+                self.client.get_contract()
+            inst.json.return_value['size'] = 100
+        self.assertEqual(str(ex.exception),
+                         'Server sent excessively sized chunk.')
 
     def inject_contract_pool(self):
         self.client.contract_pools.append(self.test_contract_pool)
@@ -1196,6 +1288,10 @@ class TestClient(unittest.TestCase):
     def test_contract_count(self):
         self.inject_contract_pool()
         self.assertEqual(self.client.contract_count(), 1)
+        
+    def test_get_total_size(self):
+        self.inject_contract_pool()
+        self.assertEqual(self.client.get_total_size(), 100)
 
     def test_heartbeat_count(self):
         self.inject_contract_pool()
@@ -1339,6 +1435,26 @@ class TestClient(unittest.TestCase):
 
         self.assertTrue(self.contract_thread.start.called)
 
+    def test_set_cert_path(self):
+        test_path = 'testpath'
+        self.client._set_requests_verify_arg = mock.MagicMock()
+        self.client.set_cert_path(test_path)
+        self.assertEqual(self.client.cert_path, test_path)
+        self.assertTrue(self.client._set_requests_verify_arg.called)
+        
+    def test_set_verify_cert(self):
+        val = not self.client.verify_cert
+        self.client._set_requests_verify_arg = mock.MagicMock()
+        self.client.set_verify_cert(val)
+        self.assertEqual(self.client.verify_cert, val)
+        self.assertTrue(self.client._set_requests_verify_arg.called)
+        
+    def test_set_requests_verify_arg_false(self):
+        self.client.verify_cert = False
+        self.client.requests_verify_arg = True
+        self.client._set_requests_verify_arg()
+        self.assertFalse(self.client.requests_verify_arg)
+        
 
 class TestExceptions(unittest.TestCase):
 
