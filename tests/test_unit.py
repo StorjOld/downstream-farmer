@@ -237,16 +237,16 @@ class TestLoadTracker(unittest.TestCase):
             t.return_value = 23
             self.tracker.finish_work()
             self.assertEqual(self.tracker.work_time(), 2)
-            self.assertAlmostEqual(self.tracker.load(), 2 / self.sample_time)
+            self.assertAlmostEqual(self.tracker.load(), 2. / self.sample_time)
 
     def test_early_chunks(self):
         with mock.patch('downstream_farmer.utils.time.time') as t:
-            t.return_value = 1
+            t.return_value = 1.
             self.tracker.start_work()
-            t.return_value = 2
+            t.return_value = 2.
             self.tracker.finish_work()
             self.assertEqual(self.tracker.work_time(), 1)
-            self.assertAlmostEqual(self.tracker.load(), 1 / t.return_value)
+            self.assertAlmostEqual(self.tracker.load(), 1. / t.return_value)
 
     def test_finish_before_start(self):
         with self.assertRaises(RuntimeError) as ex:
