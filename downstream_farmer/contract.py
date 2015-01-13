@@ -1,6 +1,5 @@
-import io
 import json
-import time
+import os
 
 from datetime import datetime, timedelta
 import requests
@@ -12,15 +11,43 @@ from .exc import DownstreamError
 
 class DownstreamContract(object):
 
-    def __init__(self, client, hash, seed, size, challenge, expiration, tag):
+    def __init__(self,
+                 client,
+                 hash,
+                 seed,
+                 size,
+                 challenge,
+                 expiration,
+                 tag,
+                 manager,
+                 chunk_dir):
         self.hash = hash
         self.seed = seed
         self.size = size
         self.challenge = challenge
         self.expiration = expiration
+        self.estimated_interval = expiration - datetime.utcnow()
         self.tag = tag
         self.client = client
         self.answered = False
+        self.thread_manager = manager
+        self.path = os.path.join(chunk_dir, self.hash)
+
+    def __repr__(self):
+        return self.hash
+
+    def generate_data(self):
+        RandomIO(self.seed).genfile(self.size, self.path)
+
+    def cleanup_data(self):
+        if (os.path.isfile(self.path)):
+            os.remove(self.path)
+
+    def __enter__(self):
+        self.generate_data()
+
+    def __exit__(self, type, value, traceback):
+        self.cleanup_data()
 
     def time_remaining(self):
         """Returns the amount of time until this challenge
@@ -32,7 +59,7 @@ class DownstreamContract(object):
             time_til_expiration = self.expiration - datetime.utcnow()
             return time_til_expiration.total_seconds()
         else:
-            return 0
+            return -self.estimated_interval.total_seconds()
 
     def update_challenge(self, block=True):
         """Updates the challenge for this contract
@@ -53,7 +80,9 @@ class DownstreamContract(object):
                       .format(time_til_expiration))
                 # contract expiration is in the future...
                 # wait til contract expiration
-                time.sleep(time_til_expiration)
+                self.thread_manager.sleep(time_til_expiration)
+                if (not self.thread_manager.running):
+                    return
             else:
                 return
 
@@ -71,6 +100,10 @@ class DownstreamContract(object):
             r_json = handle_json_response(resp)
         except DownstreamError:
             raise DownstreamError('Challenge update failed.')
+
+        if ('status' in r_json and r_json['status'] == 'no more challenges'):
+            raise DownstreamError(
+                'No more challenges for contract {0}'.format(self.hash))
 
         for k in ['challenge', 'due', 'answered']:
             if (k not in r_json):
@@ -94,7 +127,8 @@ class DownstreamContract(object):
                                           self.client.token,
                                           self.hash)
 
-        with io.BytesIO(RandomIO(self.seed).read(self.size)) as f:
+        # ok now we will read from file
+        with open(self.path, 'rb') as f:
             proof = self.client.heartbeat.prove(f, self.challenge, self.tag)
 
         data = {
