@@ -2,6 +2,8 @@
 
 ### Master
 
+### v0.1.5
+
 * [ENHANCEMENT] Restructured farmer to include multithreading: multiple contract pools for answering contracts, and a contract management thread for maintaining the desired total contract size
 * [ENHANCEMENT] Modified farmer to write chunks to disk in order to do some limited verification of dedicated hard disk capacity.
 
