@@ -421,7 +421,7 @@ class DownstreamClient(object):
                 print('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
                 break
-        
+
         # contract manager is done, remove all contracts
         self._remove_all_contracts()
 
