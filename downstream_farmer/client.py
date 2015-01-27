@@ -264,7 +264,7 @@ class DownstreamClient(object):
     def get_contract(self, size=None):
         """Gets a chunk contract from the connected node
 
-        :param size: the maximum size of the contract, not yet used
+        :param size: the maximum size of the contract
         """
         url = '{0}/chunk/{1}'.format(self.api_url, self.token)
         if (size is not None):
@@ -395,8 +395,8 @@ class DownstreamClient(object):
                         contract.hash[:8], contract.size))
                     self._add_contract(contract, wake_on_hb)
                     print('Capacity filled {0}%'.format(
-                        round(self.get_total_size() /
-                              self.desired_size * 100, 2)))
+                        round((self.get_total_size() /
+                               self.desired_size) * 100, 2)))
             except DownstreamError as ex:
                 if (self.contract_count() == 0):
                     print('Unable to obtain a contract: {0}'.format(str(ex)))
