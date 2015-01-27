@@ -396,7 +396,7 @@ class DownstreamClient(object):
                     self._add_contract(contract, wake_on_hb)
                     print('Capacity filled {0}%'.format(
                         round(float(self.get_total_size()) /
-                               float(self.desired_size) * 100, 2)))
+                              float(self.desired_size) * 100, 2)))
             except DownstreamError as ex:
                 if (self.contract_count() == 0):
                     print('Unable to obtain a contract: {0}'.format(str(ex)))
