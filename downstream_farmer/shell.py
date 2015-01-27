@@ -95,7 +95,7 @@ def parse_args(args=None):
                         .format(identity_path))
     parser.add_argument('-d', '--data-directory', default=chunk_path,
                         help='Data directory to place file chunks.  By default'
-                        '{0}'.format(chunk_path))
+                        ' {0}'.format(chunk_path))
     parser.add_argument('-k', '--keepalive', help='Will attempt to reconnect '
                         'upon failure.', action='store_true')
     parser.add_argument('--ssl-no-verify', help='Do not verify ssl '
