@@ -31,7 +31,7 @@ class DownstreamContract(object):
         self.client = client
         self.answered = False
         self.thread_manager = manager
-        self.path = os.path.join(chunk_dir, self.hash)        
+        self.path = os.path.join(chunk_dir, self.hash)
 
     def __repr__(self):
         return self.hash
@@ -127,16 +127,16 @@ class DownstreamContract(object):
                                           self.client.token,
                                           self.hash)
 
-        print('Answering challenge for contract {0}...: {1}'.\
+        print('Answering challenge for contract {0}...: {1}'.
               format(self.hash[:10], self.challenge.todict()))
-                                          
+
         # ok now we will read from file
         with open(self.path, 'rb') as f:
             proof = self.client.heartbeat.prove(f, self.challenge, self.tag)
 
-        print('Sending proof for contract {0}...: {1}'.\
+        print('Sending proof for contract {0}...: {1}'.
               format(self.hash[:10], proof.todict()))
-            
+
         data = {
             'proof': proof.todict()
         }
