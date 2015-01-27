@@ -404,12 +404,12 @@ class DownstreamClient(object):
                         continue
                     else:
                         self.thread_manager.signal_shutdown()
-                        return
+                        break
                 else:
                     print('No chunks of the correct size available now.')
             if (not self.thread_manager.running):
                 # we already exited.  contract_manager needs to return now
-                return
+                break
             # wait until we need to obtain a new contract
             if (not online_already):
                 print('Your farmer is online.')
@@ -420,7 +420,10 @@ class DownstreamClient(object):
                 # signal a shutdown, and return
                 print('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
-                return
+                break
+        
+        # contract manager is done, remove all contracts
+        self._remove_all_contracts()
 
     def run_async(self, retry=False, number=None):
         """Starts the contract management loop
