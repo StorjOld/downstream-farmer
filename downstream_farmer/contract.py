@@ -128,14 +128,14 @@ class DownstreamContract(object):
                                           self.hash)
 
         print('Answering challenge for contract {0}...: {1}'.
-              format(self.hash[:10], self.challenge.todict()))
+              format(self.hash[:8], self.challenge.todict()))
 
         # ok now we will read from file
         with open(self.path, 'rb') as f:
             proof = self.client.heartbeat.prove(f, self.challenge, self.tag)
 
         print('Sending proof for contract {0}...: {1}'.
-              format(self.hash[:10], proof.todict()))
+              format(self.hash[:8], proof.todict()))
 
         data = {
             'proof': proof.todict()
