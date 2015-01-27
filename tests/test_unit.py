@@ -1568,7 +1568,7 @@ class TestShell(unittest.TestCase):
 
     def test_parse_args_size_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.size, 100)
+        self.assertEqual(args.size, 32768)
 
     def test_parse_args_address(self):
         sys.argv.append('--address')
