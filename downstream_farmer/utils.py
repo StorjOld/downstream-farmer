@@ -12,6 +12,8 @@ import threading
 import time
 
 from collections import deque
+from queue import Queue
+from datetime import datetime
 
 from .exc import DownstreamError
 
@@ -99,6 +101,18 @@ def restore(path):
         return dict()
 
 
+def sizeof_fmt(num, suffix='B'):
+    """
+    From: http://stackoverflow.com/questions/1094841/reusable-library-to-get-human-readable-version-of-file-size
+    Written by Fred Cirera
+    """
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
 class ManagedThread(threading.Thread):
 
     def __init__(self, target=None, name=None, args=(), kwargs={}):
@@ -112,8 +126,17 @@ class ManagedThread(threading.Thread):
         self.attached_event = threading.Event()
 
     def wait(self, timeout=None):
+        """This will wait until wake is called but no longer than the specified
+        timeout.
+        """
+        #timeout_string = 'indefinitely' if timeout is None \
+        #    else '{0} seconds'.format(timeout)
+        #print('Thread {0} sleeping {1}'.format(self, timeout_string))
         self.attached_event.wait(timeout)
+        #print('Thread {0} awoken'.format(self))
+        # if wake is called now, it is ok, because the thread is already awake.
         self.attached_event.clear()
+        # if wake is called now, the next wait call will not block
 
     def wake(self):
         self.attached_event.set()
@@ -135,7 +158,7 @@ class ThreadManager(object):
         for t in self.threads:
             t.wake()
 
-    def sleep(self, timeout):
+    def sleep(self, timeout=None):
         """Calls the wait function on the current ManagedThread
         Should be called from within a managed thread.
         Use this instead of time.sleep() so that the managed thread
@@ -164,14 +187,17 @@ class ThreadManager(object):
 
     def _child_wrapper(self, target=None, args=(), kwargs={}):
         try:
+            print('Starting {0}'.format(threading.current_thread()))
             target(*args, **kwargs)
+            print('{0} finished'.format(threading.current_thread()))
         except:
             traceback.print_exc()
             self.signal_shutdown()
 
-    def create_thread(self, target=None, args=(), kwargs={}):
-        thread = ManagedThread(
-            target=self._child_wrapper, args=(target, args, kwargs))
+    def create_thread(self, name=None, target=None, args=(), kwargs={}):
+        thread = ManagedThread(name=name,
+                               target=self._child_wrapper,
+                               args=(target, args, kwargs))
         self.threads.append(thread)
         return thread
 
@@ -191,6 +217,150 @@ class ThreadManager(object):
                 # when interrupted this sleep will raise the interrupted error
                 pass
         self.finish()
+
+class WorkItem(object):
+    def __init__(self, target=None, args=[], kwargs={}):
+        self.target = target
+        self.args = args
+        self.kwargs = kwargs
+        
+    def __call__(self):
+        self.target(*self.args, **self.kwargs)
+
+
+class WorkerThread(threading.Thread):
+    def __init__(self, thread_pool=None):
+        """Initializes the worker thread
+
+        A worker thread has an attached load tracker
+        """
+        threading.Thread.__init__(self, target=self._run)
+        self.daemon = True
+        self.load_tracker = LoadTracker()
+        self.thread_pool = thread_pool
+        self.running = True
+        
+    def stop(self):
+        """Stops the worker thread after it finishes it's next batch of work
+        It will zombify this thread.
+        """
+        self.running = False
+        
+    def _run(self):
+        """this thread will run unmanaged, and so will die dirty when program
+        closes.  therefore we use a monitor thread to make sure any
+        unfinished work is done before the program shuts down
+        """
+        self.load_tracker.start_work()
+        while self.running:
+            #print('{0} : waiting on work'.format(threading.current_thread()))
+            
+            self.load_tracker.finish_work()
+            #print('{0} : finished work, load: {1}%'.format(threading.current_thread(), round(self.load_tracker.load()*100.0, 2)))
+            work = self.thread_pool.tasks.get()
+            self.load_tracker.start_work()
+            try:
+                #print('{0} : starting work'.format(threading.current_thread()))
+                work()
+            except:
+                traceback.print_exc()
+                self.thread_pool.thread_manager.signal_shutdown()
+            #print('{0} : done working'.format(threading.current_thread()))
+            self.thread_pool.tasks.task_done()
+
+
+class ThreadPool(object):
+    def __init__(self, thread_manager, thread_count=10):
+        """Initialization method
+        
+        :param thread_manager: the thread manager to use
+        :param thread_count: the number of workers to instantiate
+        """
+        self.tasks = Queue()           
+        self.thread_manager = thread_manager
+        self.workers = list()
+        self.workers_lock = threading.Lock()
+        for i in range(0, thread_count):            
+            self._add_thread()
+        # managed monitor thread
+        self.monitor_thread = self.thread_manager.create_thread(
+            name='MonitorThread',
+            target=self._monitor)
+        self.load_minimum = 0.01
+        self.load_maximum = 0.25
+    
+    def thread_count(self):
+        with self.workers_lock: 
+            return len(self.workers)
+    
+    def _add_thread(self):
+        # unmanaged worker threads
+        print('{0} : adding worker'.format(threading.current_thread()))
+        worker = WorkerThread(self)
+        with self.workers_lock:
+            self.workers.append(worker)
+        return worker
+        
+    def _remove_thread(self):
+        with self.workers_lock:
+            if (len(self.workers) > 1):
+                print('{0} : removing worker'.format(threading.current_thread()))
+                # make sure to retain one worker
+                thread = self.workers.popleft()
+                thread.stop()
+    
+    def _calculate_loading(self):
+        total_time = 0
+        work_time = 0
+        #stats = list()
+        with self.workers_lock:
+            for w in self.workers:
+                total_time += w.load_tracker.total_time()
+                work_time += w.load_tracker.work_time()
+                #stats.append((work_time, total_time))
+        load = float(work_time)/float(total_time)
+        # print('ThreadPool loaded: {0}%'.format(round(load * 100.0, 2)))
+        # print('ThreadPool worker stats: {0}'.format(', '.join(['{0}%'.format(round(a[0]/a[1]*100,1)) for a in stats])))
+        return load
+    
+    def check_loading(self):
+        self.monitor_thread.wake()
+    
+    def _monitor(self):
+        """This runs until the thread manager wakes it up during
+        shutdown, at which time it will wait for any unfinished work in the
+        queue, and then finish, allowing the program to exit
+        """
+        # wait until shutdown is called
+        while (self.thread_manager.running):
+            # check loading every second to see if we should add another thread.
+            load = self._calculate_loading()
+            if (load > self.load_maximum):
+                worker = self._add_thread()
+                worker.start()
+            elif (load < self.load_minimum):
+                self._remove_thread()                        
+            self.thread_manager.sleep(10)
+        # wait for any existing work to finish
+        print('MonitorThread waiting for tasks to finish')
+        self.tasks.join()
+        print('MonitorThread finishing')
+        # now, managed thread can exit so program can close cleanly
+    
+    def put_work(self, target, args=[], kwargs={}):
+        """Puts work in the work queue.
+        :param work: callable work object 
+        """
+        self.tasks.put(WorkItem(target, args, kwargs))
+    
+    def start(self):
+        """Starts the thread pool and all its workers and the monitor thread
+        """
+        with self.workers_lock:
+            for worker in self.workers:
+                worker.start()
+        self.monitor_thread.start()
+        
 
 
 class ShellApplication(ThreadManager):
@@ -212,6 +382,9 @@ class ShellApplication(ThreadManager):
         self.signal_shutdown()
 
 
+    
+        
+        
 class WorkChunk(object):
 
     """Encapsulates a chunk of work for the load tracker
@@ -246,11 +419,11 @@ class LoadTracker(object):
         self.work_chunks = deque()
         self.current_work_start = None
         self.sample_time = sample_time
-        self.start = time.time()
+        self.start = time.clock()
 
     @property
     def sample_start(self):
-        sample_start = time.time() - self.sample_time
+        sample_start = time.clock() - self.sample_time
         if (sample_start < self.start):
             sample_start = self.start
         return sample_start
@@ -264,7 +437,7 @@ class LoadTracker(object):
 
     def start_work(self):
         with self.lock:
-            self.current_work_start = time.time()
+            self.current_work_start = time.clock()
 
     def finish_work(self):
         with self.lock:
@@ -272,7 +445,7 @@ class LoadTracker(object):
                 raise RuntimeError('Load tracker work chunk must be started '
                                    'before it can be finished.')
             self.work_chunks.append(
-                WorkChunk(self.current_work_start, time.time()))
+                WorkChunk(self.current_work_start, time.clock()))
             self.current_work_start = None
             self._trim()
 
@@ -286,12 +459,90 @@ class LoadTracker(object):
             # add any current work
             if (self.current_work_start is not None):
                 work_total += WorkChunk(self.current_work_start,
-                                        time.time()).\
+                                        time.clock()).\
                     elapsed_from_start(sample_start)
         return work_total
 
     def total_time(self):
-        return time.time() - self.sample_start
+        return time.clock() - self.sample_start
 
     def load(self):
         return float(self.work_time()) / float(self.total_time())
+
+
+class BurstQueueItem(object):
+    """This class encapsulates an item that has a due date where where an
+    activity must be performed on the item before that due date, but after
+    the earliest time specified.
+    
+    The due date indicates that the action must be performed as soon as
+    possible, while ready indicates whether the action can be performed.
+    basically, it can be performed any time between earliest and the due
+    date, but must be performed soon after the due date
+    """
+    def __init__(self, item, due, earliest=None):
+        self.item = item
+        self.due = due
+        self.earliest = earliest
+
+    def is_due(self):
+        return self.due < datetime.utcnow()
+        
+    def is_ready(self):
+        if (self.earliest is None):
+            return True
+        return self.earliest < datetime.utcnow()
+
+
+class BurstQueue(object):
+    """
+    This class will help us perform heartbeats in a timely manner.
+    
+    Items can be placed in this queue.  Items have a 'due date' 
+    When `get` is called, it either returns an empty list if there are
+    no due items, or if there are any due items, it will return
+    all the items in the queue that are ready.
+    """
+    def __init__(self):
+        self.queue = deque()
+        self.queue_lock = threading.Lock()
+    
+    def put(self, item, due, earliest=None):
+        with self.queue_lock:
+            self.queue.append(BurstQueueItem(item, due, earliest))
+        
+    def get(self):
+        """Gets the list of ready items if any items are due"""
+        if (self._any_due()):
+            with self.queue_lock:
+                ready_items = list()
+                unready_items = deque()
+                for i in self.queue:
+                    if i.is_ready():
+                        ready_items.append(i.item)
+                    else:
+                        unready_items.append(i)
+                self.queue = unready_items
+                return ready_items
+        else:
+            return list()
+        
+    def next_due(self):
+        """Gets the next due time
+        """
+        earliest = None
+        with self.queue_lock:
+            for queue_item in self.queue:
+                if (earliest is None or queue_item.due < earliest):
+                    earliest = queue_item.due
+        return earliest
+    
+    def _any_due(self):
+        """Returns whether any items are due
+        """
+        with self.queue_lock:
+            for queue_item in self.queue:
+                if (queue_item.is_due()):
+                    return True
+        return False
+            
