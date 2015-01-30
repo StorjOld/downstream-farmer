@@ -21,7 +21,7 @@ from downstream_farmer.utils import (ManagedThread,
                                      ShellApplication)
 from downstream_farmer.utils import WorkChunk, LoadTracker
 from downstream_farmer.farmer import Farmer
-from downstream_farmer.client import DownstreamClient, ContractPool
+from downstream_farmer.client import DownstreamClient
 from downstream_farmer.contract import DownstreamContract
 from downstream_farmer.exc import DownstreamError
 from heartbeat import Heartbeat
@@ -214,7 +214,7 @@ class TestLoadTracker(unittest.TestCase):
     def setUp(self):
         self.start_time = 0
         self.sample_time = 10
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = self.start_time
             self.tracker = LoadTracker(self.sample_time)
 
@@ -223,20 +223,20 @@ class TestLoadTracker(unittest.TestCase):
 
     def test_sample_start_full(self):
         now = 20
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = now
             sample_start = self.tracker.sample_start
         self.assertEqual(sample_start, now - self.sample_time)
 
     def test_sample_start_partial(self):
         now = 5
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = now
             sample_start = self.tracker.sample_start
         self.assertEqual(sample_start, self.start_time)
 
     def test_normal_chunks(self):
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             # add a couple of work chunks
             t.return_value = 20
             self.tracker.start_work()
@@ -250,7 +250,7 @@ class TestLoadTracker(unittest.TestCase):
             self.assertAlmostEqual(self.tracker.load(), 2. / self.sample_time)
 
     def test_early_chunks(self):
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = 1.
             self.tracker.start_work()
             t.return_value = 2.
@@ -265,7 +265,7 @@ class TestLoadTracker(unittest.TestCase):
                          'started before it can be finished.')
 
     def test_chunk_expiry(self):
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = 5
             self.tracker.start_work()
             t.return_value = 10
@@ -282,7 +282,7 @@ class TestLoadTracker(unittest.TestCase):
             self.assertAlmostEqual(self.tracker.load(), 0.5)
 
     def test_unfinished_work(self):
-        with mock.patch('downstream_farmer.utils.time.time') as t:
+        with mock.patch('downstream_farmer.utils.time.clock') as t:
             t.return_value = 5
             self.tracker.start_work()
             t.return_value = 10
@@ -567,8 +567,7 @@ class TestFarmer(unittest.TestCase):
                 '',
                 farmer,
                 farmer.chunk_dir)
-            patch.return_value.run_async.assert_called_with(
-                True, farmer.number)
+            patch.return_value.run_async.assert_called_with(True, farmer.number)
             self.assertTrue(w.called)
             self.assertTrue(patch.return_value.connect.called)
             self.assertEqual(farmer
@@ -638,13 +637,13 @@ class TestContract(unittest.TestCase):
 
     def setUp(self):
         self.challenge = Heartbeat.challenge_type().\
-            fromdict(MockValues.get_challenge_response['challenge'])
+            fromdict(MockValues.get_challenges_response['challenges'][0]['challenge'])
         self.heartbeat = Heartbeat.fromdict(
             MockValues.connect_response['heartbeat'])
         self.tag = Heartbeat.tag_type().fromdict(
-            MockValues.get_chunk_response['tag'])
+            MockValues.get_chunks_response['chunks'][0]['tag'])
         self.expiration = datetime.utcnow(
-        ) + timedelta(int(MockValues.get_chunk_response['due']))
+        ) + timedelta(int(MockValues.get_chunks_response['chunks'][0]['due']))
         self.client = mock.MagicMock()
         self.manager = ThreadManager()
         self.test_hash = 'hash'
@@ -679,183 +678,6 @@ class TestContract(unittest.TestCase):
     def test_repr(self):
         self.assertEqual(str(self.contract), self.contract.hash)
 
-    def test_with(self):
-        with self.contract:
-            self.assertTrue(os.path.isfile(self.contract.path))
-        self.assertFalse(os.path.exists(self.contract.path))
-
-    def test_time_remaining(self):
-        self.assertLessEqual(self.contract.time_remaining(), 0)
-
-        with mock.patch('downstream_farmer.contract.datetime') as patch:
-            patch.utcnow.return_value = datetime.utcnow()
-            self.contract.answered = True
-            dt = self.contract.expiration - patch.utcnow.return_value
-            result = self.contract.time_remaining()
-        self.assertEqual(result, dt.total_seconds())
-
-    def test_update_challenge_answered(self):
-        # answered is false, so this should return immediately with no issues
-        self.assertIsNone(self.contract.update_challenge())
-
-    def test_update_challenge_block(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 1
-        self.contract.thread_manager = mock.MagicMock()
-        with mock.patch(
-                'downstream_farmer.contract.requests.get') as getpatch:
-            getpatch.return_value.json.return_value =\
-                MockValues.get_challenge_response
-            self.contract.update_challenge()
-            self.assertTrue(self.contract.thread_manager.sleep.called)
-
-    def test_update_challenge_exit_after_sleep(self):
-        self.contract.answered = True
-        self.contract.thread_manager = mock.MagicMock()
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 1
-        self.contract.thread_manager.running = False
-        with mock.patch('downstream_farmer.contract.requests.get') as getpatch:
-            self.contract.update_challenge()
-        self.contract.thread_manager.sleep.assert_called_with(1)
-        self.assertFalse(getpatch.called)
-
-    def test_update_challenge_no_block(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 1
-        with mock.patch('time.sleep') as sleeppatch,\
-                mock.patch(
-                    'downstream_farmer.contract.requests.get') as getpatch:
-            getpatch.return_value.json.return_value =\
-                MockValues.get_challenge_response
-            self.contract.update_challenge(block=False)
-            self.assertFalse(sleeppatch.called)
-
-    def test_update_challenge_get_fail(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 0
-        with mock.patch('downstream_farmer.contract.requests.get') as getpatch:
-            getpatch.side_effect = Exception('error')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.update_challenge()
-            self.assertEqual(str(ex.exception), 'Unable to perform HTTP get.')
-
-    def test_update_challenge_failed(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 0
-        with mock.patch(
-                'downstream_farmer.contract.requests.get'),\
-                mock.patch('downstream_farmer.contract.handle_json_response')\
-                as hpatch:
-            hpatch.side_effect = DownstreamError('error')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.update_challenge()
-            self.assertEqual(str(ex.exception), 'Challenge update failed.')
-
-    def test_update_challenge_no_more_challenges(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 0
-        with mock.patch(
-            'downstream_farmer.contract.requests.get'),\
-                mock.patch('downstream_farmer.contract.handle_json_response')\
-                as hpatch:
-            hpatch.return_value = dict(status='no more challenges')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.update_challenge()
-            self.assertEqual(str(
-                ex.exception),
-                'No more challenges for contract {0}'.
-                format(self.contract.hash))
-
-    def test_update_challenge_malformed(self):
-        self.contract.answered = True
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 0
-        with mock.patch('downstream_farmer.contract.requests.get'),\
-                mock.patch('downstream_farmer.contract.handle_json_response')\
-                as hpatch:
-            hpatch.return_value = dict(invalid='dict')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.update_challenge()
-            self.assertEqual(
-                str(ex.exception), 'Malformed response from server.')
-
-    def test_update_challenge_working(self):
-        self.contract.answered = True
-        self.client.heartbeat = self.heartbeat
-        self.contract.time_remaining = mock.MagicMock()
-        self.contract.time_remaining.return_value = 0
-        with mock.patch('downstream_farmer.contract.requests.get') as getpatch:
-            getpatch.return_value.json.return_value =\
-                MockValues.get_challenge_response
-            self.contract.update_challenge()
-            self.assertEqual(self.contract.challenge,
-                             Heartbeat.challenge_type().fromdict(
-                                 MockValues
-                                 .get_challenge_response['challenge']))
-            self.assertAlmostEqual((self.
-                                    contract.expiration - datetime.utcnow()).
-                                   total_seconds(),
-                                   int(MockValues.
-                                       get_challenge_response['due']),
-                                   delta=0.5)
-
-    def test_answer_challenge_answered(self):
-        self.contract.answered = True
-        self.assertIsNone(self.contract.answer_challenge())
-
-    def test_answer_challenge_post_fail(self):
-        self.client.heartbeat = self.heartbeat
-        with mock.patch('downstream_farmer.contract.requests.post') as ppatch:
-            ppatch.side_effect = Exception('test error')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.answer_challenge()
-            self.assertEqual(str(ex.exception), 'Unable to perform HTTP post.')
-
-    def test_answer_challenge_failed(self):
-        self.client.heartbeat = self.heartbeat
-        with mock.patch('downstream_farmer.contract.requests.post'),\
-                mock.patch('downstream_farmer.contract.handle_json_response')\
-                as hpatch:
-            hpatch.side_effect = DownstreamError('test error')
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.answer_challenge()
-            self.assertEqual(
-                str(ex.exception), 'Challenge answer failed: test error')
-
-    def test_answer_malformed(self):
-        self.client.heartbeat = self.heartbeat
-        with mock.patch('downstream_farmer.contract.requests.post') as patch:
-            inst = patch.return_value
-            inst.json.return_value = {"invalid": "dict"}
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.answer_challenge()
-            self.assertEqual(
-                str(ex.exception), 'Malformed response from server.')
-
-    def test_answer_invalid(self):
-        self.client.heartbeat = self.heartbeat
-        with mock.patch('downstream_farmer.contract.requests.post') as patch:
-            inst = patch.return_value
-            inst.json.return_value = {"status": "dict"}
-            with self.assertRaises(DownstreamError) as ex:
-                self.contract.answer_challenge()
-            self.assertEqual(str(ex.exception), 'Challenge response rejected.')
-
-    def test_answer_working(self):
-        self.client.heartbeat = self.heartbeat
-        with mock.patch('downstream_farmer.contract.requests.post') as patch:
-            inst = patch.return_value
-            inst.json.return_value = {"status": "ok"}
-            self.contract.answer_challenge()
-            self.assertTrue(self.contract.answered)
-
-
 class MockContractShutdown(object):
 
     def __init__(self, manager):
@@ -885,193 +707,13 @@ class MockContractWait(object):
         self.contract.time_remaining.return_value = 0
 
 
-class TestContractPool(unittest.TestCase):
-
-    def setUp(self):
-        self.manager = ThreadManager()
-        self.contract_thread = ManagedThread()
-        self.contract_pool = ContractPool(self.manager,
-                                          self.contract_thread)
-
-    def tearDown(self):
-        self.contract_pool.remove_all_contracts()
-
-    def test_init(self):
-        self.assertEqual(len(self.contract_pool.contracts), 0)
-
-    def test_delete(self):
-        pool = ContractPool(self.manager,
-                            self.contract_thread)
-
-        mock_remove_all = mock.MagicMock()
-        pool.remove_all_contracts = mock_remove_all
-
-        pool.__del__()
-
-        self.assertTrue(mock_remove_all.called)
-
-    def test_repr(self):
-        self.assertEqual(str(self.contract_pool), self.contract_pool.id)
-
-    def test_start(self):
-        self.contract_pool.thread = mock.MagicMock()
-        self.contract_pool.start()
-        self.assertTrue(self.contract_pool.thread.start.called)
-
-    def add_test_contracts(self):
-        self.contract1 = mock.MagicMock()
-        self.contract1.size = 100
-        self.contract1.time_remaining.return_value = 10
-        self.contract2 = mock.MagicMock()
-        self.contract2.size = 200
-        self.contract2.time_remaining.return_value = 20
-        self.contract_pool.add_contract(self.contract1)
-        self.contract_pool.add_contract(self.contract2)
-
-    def test_get_total_size(self):
-        self.add_test_contracts()
-        self.assertEqual(self.contract_pool.get_total_size(), 300)
-
-    def test_get_total_size_zero(self):
-        self.assertEqual(self.contract_pool.get_total_size(), 0)
-
-    def test_contract_count(self):
-        self.add_test_contracts()
-        self.assertEqual(self.contract_pool.contract_count(), 2)
-
-    def test_get_average_load(self):
-        self.contract_pool.load_tracker = mock.MagicMock()
-        self.assertEqual(self.contract_pool.get_average_load(),
-                         self.contract_pool.load_tracker.load.return_value)
-
-    def test_remove_contract(self):
-        self.add_test_contracts()
-        self.assertEqual(self.contract_pool.contract_count(), 2)
-        self.contract_pool.remove_contract(self.contract1)
-        self.assertEqual(self.contract_pool.contract_count(), 1)
-        self.assertTrue(self.contract1.cleanup_data.called)
-
-    def test_remove_all_contracts(self):
-        self.add_test_contracts()
-        self.contract_pool.remove_all_contracts()
-        self.assertEqual(self.contract_pool.contract_count(), 0)
-        self.assertTrue(self.contract1.cleanup_data.called)
-        self.assertTrue(self.contract2.cleanup_data.called)
-
-    def test_get_next_contract(self):
-        self.add_test_contracts()
-        self.assertEqual(self.contract_pool.get_next_contract(),
-                         self.contract1)
-
-    def add_due_contract(self):
-        self.contract0 = mock.MagicMock()
-        self.contract0.size = 100
-        self.contract0.time_remaining.return_value = 0
-        self.contract_pool.add_contract(self.contract0)
-
-    def mock_thread_manager(self):
-        self.contract_pool.thread_manager = mock.MagicMock()
-        self.contract_pool.thread_manager.running = True
-
-    def test_run_challenge_response_loop(self):
-        self.add_due_contract()
-        self.contract_pool.wake_ct_on_hb = True
-        self.mock_thread_manager()
-        self.contract_pool.contract_thread = mock.MagicMock()
-
-        self.contract_pool.contract_thread.wake.side_effect = \
-            MockContractShutdown(self.contract_pool.thread_manager)
-
-        self.contract_pool._run_challenge_response_loop()
-
-        self.contract0.update_challenge.assert_called_with(False)
-        self.assertTrue(self.contract0.answer_challenge.called)
-
-    def add_waitable_contract(self):
-        self.contract1 = mock.MagicMock()
-        self.contract1.size = 100
-        self.contract1.time_remaining.return_value = 1
-        self.contract_pool.add_contract(self.contract1)
-
-    def test_run_challenge_response_loop_no_contracts_wait(self):
-        self.mock_thread_manager()
-
-        self.contract_pool.thread = mock.MagicMock()
-
-        self.contract_pool.thread.wait.side_effect = \
-            MockContractShutdown(self.contract_pool.thread_manager)
-
-        self.contract_pool._run_challenge_response_loop()
-
-        self.assertTrue(self.contract_pool.thread.wait.called)
-
-    def test_run_challenge_response_loop_next_contract_wait(self):
-        self.add_waitable_contract()
-        self.contract_pool.wake_ct_on_hb = True
-        self.mock_thread_manager()
-        self.contract_pool.thread = mock.MagicMock()
-
-        self.contract_pool.thread.wait.side_effect = \
-            MockContractWait(self.contract1)
-
-        self.contract_pool.contract_thread = mock.MagicMock()
-
-        self.contract_pool.contract_thread.wake.side_effect = \
-            MockContractShutdown(self.contract_pool.thread_manager)
-
-        self.contract_pool._run_challenge_response_loop()
-
-        self.contract_pool.thread.wait.assert_called_with(3)
-
-    def test_run_challenge_response_loop_update_failed(self):
-        self.add_due_contract()
-        self.mock_thread_manager()
-
-        self.contract0.update_challenge.side_effect = \
-            MockShutdownAndRaise(self.contract_pool.thread_manager,
-                                 DownstreamError('test error'))
-
-        self.contract_pool._run_challenge_response_loop()
-
-        # contract should have been removed
-
-        self.assertEqual(self.contract_pool.contract_count(), 0)
-
-    def test_run_challenge_response_loop_answer_failed(self):
-        self.add_due_contract()
-        self.mock_thread_manager()
-
-        self.contract0.answer_challenge.side_effect = \
-            MockShutdownAndRaise(self.contract_pool.thread_manager,
-                                 DownstreamError('test error'))
-
-        self.contract_pool._run_challenge_response_loop()
-
-        # contract should have been removed
-
-        self.assertEqual(self.contract_pool.contract_count(), 0)
-
-    def test_run_challenge_response_loop_unexpected_error(self):
-        self.contract_pool.get_next_contract = mock.MagicMock()
-        self.contract_pool.get_next_contract.side_effect = Exception(
-            'test error')
-        self.contract_pool.remove_all_contracts = mock.MagicMock()
-        self.contract_pool.thread_manager = mock.MagicMock()
-
-        self.contract_pool._run_challenge_response_loop()
-
-        self.assertTrue(self.contract_pool.remove_all_contracts.called)
-        self.assertTrue(
-            self.contract_pool.thread_manager.signal_shutdown.called)
-
-
 class AddContractMock(object):
 
     def __init__(self, client, manager_to_shutdown=None):
         self.client = client
         self.manager = manager_to_shutdown
 
-    def __call__(self, contract, wake_on_hb):
+    def __call__(self, contract):
         self.client.get_total_size.return_value += contract.size
         if (self.manager is not None):
             self.manager.running = False
@@ -1100,23 +742,20 @@ class TestClient(unittest.TestCase):
                                        self.chunk_dir)
         self.test_contract = \
             DownstreamContract(self.client,
-                               MockValues.get_chunk_response['file_hash'],
-                               MockValues.get_chunk_response['seed'],
-                               MockValues.get_chunk_response['size'],
+                               MockValues.get_chunks_response['chunks'][0]['file_hash'],
+                               MockValues.get_chunks_response['chunks'][0]['seed'],
+                               MockValues.get_chunks_response['chunks'][0]['size'],
                                Heartbeat.challenge_type().fromdict(
-                                   MockValues.get_chunk_response['challenge']),
+                                   MockValues.get_chunks_response['chunks'][0]['challenge']),
                                datetime.utcnow() + timedelta(
                                    seconds=int(
-                                       MockValues.get_chunk_response['due'])),
+                                       MockValues.get_chunks_response['chunks'][0]['due'])),
                                Heartbeat.tag_type().fromdict(
-                                   MockValues.get_chunk_response['tag']),
+                                   MockValues.get_chunks_response['chunks'][0]['tag']),
                                self.thread_manager,
                                self.chunk_dir)
         self.test_heartbeat = Heartbeat.fromdict(
             MockValues.connect_response['heartbeat'])
-        self.test_contract_pool = ContractPool(self.thread_manager,
-                                               self.contract_thread)
-        self.test_contract_pool.add_contract(self.test_contract)
 
     def tearDown(self):
         pass
@@ -1127,12 +766,6 @@ class TestClient(unittest.TestCase):
         self.assertEqual(self.client.token, self.token)
         self.assertEqual(self.client.desired_size, self.size)
         self.assertIsNone(self.client.heartbeat)
-        self.assertEqual(len(self.client.contract_pools), 0)
-
-    def test_delete(self):
-        self.client._remove_all_contracts = mock.MagicMock()
-        self.client.__del__()
-        self.assertTrue(self.client._remove_all_contracts.called)
 
     def test_connect_no_token_no_address(self):
         self.client.address = None
@@ -1231,7 +864,7 @@ class TestClient(unittest.TestCase):
                 as hp:
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
-                self.client.get_contract()
+                self.client._get_contracts()
             self.assertEqual(
                 str(ex.exception), 'Unable to get token: test error')
 
@@ -1239,28 +872,28 @@ class TestClient(unittest.TestCase):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             patch.return_value.json.return_value = {"invalid": "dict"}
             with self.assertRaises(DownstreamError) as ex:
-                self.client.get_contract()
+                self.client._get_contracts()
             self.assertEqual(
                 str(ex.exception), 'Malformed response from server.')
 
-    def test_get_contract_working(self):
+    def test_get_contracts_working(self):
         self.client.heartbeat = self.test_heartbeat
         with mock.patch('downstream_farmer.client.requests.get') as patch:
             inst = patch.return_value
-            inst.json.return_value = MockValues.get_chunk_response
-            contract = self.client.get_contract(100)
+            inst.json.return_value = MockValues.get_chunks_response.copy()
+            contracts = self.client._get_contracts(100)
         self.assertEqual(
-            contract.hash, self.test_contract.hash)
+            contracts[0].hash, self.test_contract.hash)
         self.assertEqual(
-            contract.seed, self.test_contract.seed)
+            contracts[0].seed, self.test_contract.seed)
         self.assertEqual(
-            contract.size, self.test_contract.size)
+            contracts[0].size, self.test_contract.size)
         self.assertEqual(
-            contract.challenge, self.test_contract.challenge)
-        self.assertAlmostEqual((contract.expiration -
+            contracts[0].challenge, self.test_contract.challenge)
+        self.assertAlmostEqual((contracts[0].expiration -
                                 self.test_contract.expiration)
                                .total_seconds(), 0, delta=1)
-        self.assertEqual(contract.tag, self.test_contract.tag)
+        self.assertEqual(contracts[0].tag, self.test_contract.tag)
 
     def test_get_contract_no_chunks_available(self):
         self.client.heartbeat = self.test_heartbeat
@@ -1268,74 +901,16 @@ class TestClient(unittest.TestCase):
                 mock.patch(
                 'downstream_farmer.client.handle_json_response'
         ) as hpatch:
-            hpatch.return_value = dict(status='no chunks available')
-            with self.assertRaises(DownstreamError) as ex:
-                self.client.get_contract()
-        self.assertEqual(str(ex.exception), 'No chunks available.')
-
-    def test_get_contract_excessively_sized_chunk(self):
-        self.client.heartbeat = self.test_heartbeat
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            inst = patch.return_value
-            inst.json.return_value = MockValues.get_chunk_response
-            inst.json.return_value['size'] = 1000
-            with self.assertRaises(DownstreamError) as ex:
-                self.client.get_contract()
-            inst.json.return_value['size'] = 100
-        self.assertEqual(str(ex.exception),
-                         'Server sent excessively sized chunk.')
-
-    def inject_contract_pool(self):
-        self.client.contract_pools.append(self.test_contract_pool)
-
-    def test_contract_count(self):
-        self.inject_contract_pool()
-        self.assertEqual(self.client.contract_count(), 1)
-
-    def test_get_total_size(self):
-        self.inject_contract_pool()
-        self.assertEqual(self.client.get_total_size(), 100)
-
-    def test_heartbeat_count(self):
-        self.inject_contract_pool()
-        self.test_contract_pool.heartbeat_count = 1
-        self.assertEqual(self.client.heartbeat_count(), 1)
-
-    def inject_mock_contract_pool(self):
-        self.mock_contract_pool = mock.MagicMock()
-        self.client.contract_pools.append(self.mock_contract_pool)
-
-    def test_add_contract_to_existing_pool(self):
-        self.inject_mock_contract_pool()
-        self.mock_contract_pool.get_average_load.return_value = 0
-        self.client._add_contract(self.test_contract)
-        self.mock_contract_pool.add_contract.assert_called_with(
-            self.test_contract)
-
-    def test_add_contract_to_new_pool(self):
-        self.inject_mock_contract_pool()
-        self.mock_contract_pool.get_average_load.return_value = 1
-        contract_pool = mock.MagicMock()
-        with mock.patch('downstream_farmer.client.ContractPool') as pool_patch:
-            pool_patch.return_value = contract_pool
-            self.client._add_contract(self.test_contract)
-        self.assertTrue(contract_pool.start.called)
-        contract_pool.add_contract.assert_called_with(self.test_contract)
-        self.assertEqual(len(self.client.contract_pools), 2)
-        self.assertEqual(self.client.contract_pools[1], contract_pool)
-
-    def test_remove_all_contracts(self):
-        self.inject_mock_contract_pool()
-        self.assertEqual(len(self.client.contract_pools), 1)
-        self.client._remove_all_contracts()
-        self.assertEqual(len(self.client.contract_pools), 0)
-        self.assertTrue(self.mock_contract_pool.remove_all_contracts.called)
+            hpatch.return_value = dict(chunks=[])
+            contracts = self.client._get_contracts()
+            self.assertEqual(len(contracts), 0)
 
     def setup_run_mocks(self):
         self.client.thread_manager = mock.MagicMock()
         self.client.thread_manager.running = True
-        self.client.get_contract = mock.MagicMock()
-        self.client.get_contract.return_value = self.test_contract
+        self.client.worker_pool = mock.MagicMock()
+        self.client._get_contracts = mock.MagicMock()
+        self.client._get_contracts.return_value = [self.test_contract]
         self.client._add_contract = mock.MagicMock()
         self.client.contract_thread = mock.MagicMock()
         self.client.get_total_size = mock.MagicMock()
@@ -1352,59 +927,42 @@ class TestClient(unittest.TestCase):
         self.client._run_contract_manager()
 
         self.assertFalse(self.client.thread_manager.signal_shutdown.called)
-        self.client._add_contract.assert_called_with(self.test_contract, False)
+        self.client._add_contract.assert_called_with(self.test_contract)
 
     def test_run_contract_manager_obtain_fail_no_retry(self):
         self.setup_run_mocks()
 
         self.client.contract_count = mock.MagicMock()
         self.client.contract_count.return_value = 0
-        self.client.get_contract.side_effect = DownstreamError('test error')
+        self.client._get_contracts.side_effect = DownstreamError('test error')
 
         self.client.thread_manager.signal_shutdown.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
-        self.client._run_contract_manager()
-
-        self.assertTrue(self.client.thread_manager.signal_shutdown.called)
+        with self.assertRaises(DownstreamError) as ex:
+            self.client._run_contract_manager()
+        self.assertEqual(str(ex.exception), 'test error')
 
     def test_run_contract_manager_obtain_fail_retry(self):
         self.setup_run_mocks()
 
         self.client.contract_count = mock.MagicMock()
         self.client.contract_count.return_value = 0
-        self.client.get_contract.side_effect = \
-            [DownstreamError('test error'), self.test_contract]
+        self.client._get_contracts.side_effect = \
+            [DownstreamError('test error'), [self.test_contract]]
 
         self.client._add_contract.side_effect = AddContractMock(self.client)
 
         self.client.contract_thread.wait.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
-        self.client._run_contract_manager(retry=True)
-
-        self.assertFalse(self.client.thread_manager.signal_shutdown.called)
-
-    def test_run_contract_manager_fail_after_acquisition(self):
-        self.setup_run_mocks()
-
-        self.client.contract_count = mock.MagicMock()
-        self.client.contract_count.return_value = 1
-
-        self.client.get_contract.side_effect = DownstreamError('test error')
-
-        self.client._add_contract.side_effect = AddContractMock(self.client)
-
-        self.client.contract_thread.wait.side_effect = \
-            MockContractShutdown(self.client.thread_manager)
-
-        self.client._run_contract_manager()
+        self.client._run_contract_manager(True)
 
         self.assertFalse(self.client.thread_manager.signal_shutdown.called)
 
     def test_run_contract_manager_shutdown_during_acquisition(self):
         self.setup_run_mocks()
-
+        
         self.client._add_contract.side_effect = \
             AddContractMock(self.client, self.client.thread_manager)
 
@@ -1424,7 +982,9 @@ class TestClient(unittest.TestCase):
         self.client.thread_manager.signal_shutdown.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
-        self.client._run_contract_manager(number=1)
+        self.client.desired_heartbeats = 1
+        
+        self.client._run_contract_manager()
 
         self.assertTrue(self.client.thread_manager.signal_shutdown.called)
 
@@ -1617,28 +1177,38 @@ class MockValues:
         "type": "Swizzle"
     }
 
-    get_chunk_response = {
-        "challenge": "AQAAACAAAACJwjEuYPkbnGOppNVgG0Xc5GKgp0g2kGN2bMCssbMBwIAA"
-                     "AACQkwnIZ7sPJxPRW41MiVTTc40LpgRx8O4hS+T5cuLx0L5KjqnIHOVy"
-                     "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
-                     "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
-                     "uYRpaw==",
-        "due": "60",
-        "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
-                     "91ce7732",
-        "seed": "eb1bb0f7cd24720d456193cca8c42edb",
-        "size": 100,
-        "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
-               "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
-               "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
+    get_chunks_response = {
+        "chunks": [
+            {
+            "challenge": "AQAAACAAAACJwjEuYPkbnGOppNVgG0Xc5GKgp0g2kGN2bMCssbMBwIAA"
+                         "AACQkwnIZ7sPJxPRW41MiVTTc40LpgRx8O4hS+T5cuLx0L5KjqnIHOVy"
+                         "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
+                         "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
+                         "uYRpaw==",
+            "due": "60",
+            "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
+                         "91ce7732",
+            "seed": "eb1bb0f7cd24720d456193cca8c42edb",
+            "size": 100,
+            "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
+                   "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
+                   "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
+            }
+        ]
     }
 
-    get_challenge_response = {
-        "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
-                     "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
-                     "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
-                     "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
-                     "FU58Vw==",
-        "due": "60",
-        "answered": True
+    get_challenges_response = {
+        "challenges": [
+            {
+                "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
+                             "91ce7732",
+                "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
+                             "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
+                             "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
+                             "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
+                             "FU58Vw==",
+                "due": "60",
+                "answered": True
+            }
+        ]
     }

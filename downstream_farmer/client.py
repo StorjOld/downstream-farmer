@@ -48,6 +48,7 @@ class DownstreamClient(object):
         
         self.contract_thread = None
         self.heartbeat_thread = None
+        self.worker_pool = None
         self.cert_path = None
         self.verify_cert = True
         self.running = True
@@ -59,6 +60,7 @@ class DownstreamClient(object):
         self.contracts = dict()
         self.heartbeat_count_lock = threading.Lock()
         self.heartbeat_count = 0
+        self.desired_heartbeats = None
         # response margin defaults to 20.  contracts will begin to be answered
         # at least this number of seconds before they expire
         self.response_margin = 20
@@ -279,26 +281,26 @@ class DownstreamClient(object):
         else:
             return max_obtainable_size
 
-    def _run_contract_manager(self, retry=False, number=None):
+    def _run_contract_manager(self, retry=False):
         """This loop will maintain the desired total contract size, if
         possible
-        :param retry: whether to retry if unable to obtain any contracts
-        :param number: the number of challenges to answer (for each contract)
-            it will perform at least this number of heartbeats and then exit,
-            but it may perform more heartbeats depending on the size of the
-            requested contracts
         """
         online_already = False
-        # we want to wake up on every heart beat in order to check if we have
-        # reached our heartbeat goal.  otherwise, don't worry about it
-        wake_on_hb = (True if number is not None else False)
 
         while (self.thread_manager.running):
             size_to_fill = self._size_to_fill()
             while (self.thread_manager.running and size_to_fill > 0):
                 print('Requesting chunks to fill {0}'
                       .format(sizeof_fmt(size_to_fill)))
-                contracts = self.get_contracts(size_to_fill)
+                try:
+                    contracts = self._get_contracts(size_to_fill)
+                except DownstreamError as ex:
+                    if (retry):
+                        print('Get contracts failed: {0}, retrying'
+                              .format(str(ex)))
+                        continue
+                    else:
+                        raise
                 obtained_size = sum([c.size for c in contracts])
                 if (obtained_size > size_to_fill):
                     raise DownstreamError('Server sent too much chunk data,' 
@@ -309,7 +311,7 @@ class DownstreamClient(object):
                     for contract in contracts:
                         self._add_contract(contract)
                         # and begin proving this contract
-                        self._put_proof(contract)
+                        self._prove_async(contract)
                     print('Contracts: {0}, Total size: {1}/{2}'.
                           format(self.contract_count(),
                                  sizeof_fmt(self.get_total_size()),
@@ -331,7 +333,8 @@ class DownstreamClient(object):
                 online_already = True
             self.contract_thread.wait(30)
 
-            if (number is not None and self.heartbeat_count() >= number):
+            if (self.desired_heartbeats is not None 
+                and self.heartbeat_count >= self.desired_heartbeats):
                 # signal a shutdown, and return
                 print('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
@@ -340,7 +343,7 @@ class DownstreamClient(object):
         # contract manager is done, remove all contracts
         self._remove_all_contracts()
     
-    def _put_proof(self, contract):
+    def _prove_async(self, contract):
         #print('Scheduling proof for contract {0}.'.format(contract))
         self.worker_pool.put_work(self._prove, (contract, ))
     
@@ -365,6 +368,9 @@ class DownstreamClient(object):
                   .format(contract))
 
         self.heartbeat_thread.wake()
+    
+    def _submit_async(self, contracts):
+        self.worker_pool.put_work(self._submit, (contracts, ))
     
     def _submit(self, contracts):
         """Submits the specified contracts
@@ -429,6 +435,8 @@ class DownstreamClient(object):
             submitted.add(contract)
             with self.heartbeat_count_lock:
                 self.heartbeat_count += 1
+                if (self.desired_heartbeats is not None):
+                    self.contract_thread.wake()
         
         stop=time.clock()
         print('Submitted {0} proofs successfully in {1} seconds'.format(len(submitted), round(stop-start,3)))
@@ -448,6 +456,9 @@ class DownstreamClient(object):
         
         # and wake heartbeat manager again
         self.heartbeat_thread.wake()
+    
+    def _update_async(self, contracts):
+        self.worker_pool.put_work(self._update, (contracts, ))
     
     def _update(self, contracts):
         
@@ -527,7 +538,7 @@ class DownstreamClient(object):
                       .format(c))
                 self._remove_contract(c)
             else:
-                self._put_proof(c)
+                self._prove_async(c)
         
         # dont need to wake heartbeat manager because we didn't put anything into a queue
 
@@ -543,13 +554,13 @@ class DownstreamClient(object):
             
             if (len(contracts_to_submit) > 0):
                 print('Submitting {0} contracts'.format(len(contracts_to_submit)))
-                self.worker_pool.put_work(self._submit, (contracts_to_submit, ))
+                self._submit_async(contracts_to_submit)
             
             contracts_to_update = self.update_queue.get()
             
             if (len(contracts_to_update) > 0):
                 print('Updating {0} contracts'.format(len(contracts_to_update)))
-                self.worker_pool.put_work(self._update, (contracts_to_update, ))
+                self._update_async(contracts_to_update)
             
             next = [self.submission_queue.next_due(),
                     self.update_queue.next_due()]
@@ -570,11 +581,14 @@ class DownstreamClient(object):
         :param retry: whether to retry on obtaining a contract upon failure
         :param number: the number of challenges to answer
         """
+        self.heartbeat_count = 0
+        self.desired_heartbeats = number
+        
         # create the contract manager
         self.contract_thread = self.thread_manager.create_thread(
             name='ContractThread',
             target=self._run_contract_manager,
-            args=(retry, number))
+            args=(retry,))
             
         # create the heartbeat manager
         self.heartbeat_thread = self.thread_manager.create_thread(
