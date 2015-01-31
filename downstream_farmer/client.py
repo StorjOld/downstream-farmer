@@ -10,13 +10,15 @@ import json
 import threading
 import traceback
 import time
+import logging
 
 import requests
 import heartbeat
 from datetime import datetime, timedelta
 from collections import deque
 
-from .utils import handle_json_response, LoadTracker, ThreadPool, sizeof_fmt, BurstQueue
+from .utils import handle_json_response, LoadTracker, ThreadPool, sizeof_fmt, \
+    BurstQueue, Counter
 from .exc import DownstreamError
 from .contract import DownstreamContract
 
@@ -82,6 +84,12 @@ class DownstreamClient(object):
         
         self.submission_queue = BurstQueue()
         self.update_queue = BurstQueue()
+        
+        self.proving_counter = Counter()
+        self.submitting_counter = Counter()
+        self.updating_counter = Counter()
+        
+        self.logger = logging.getLogger('storj.downstream_farmer.DownstreamClient')
 
     def set_cert_path(self, cert_path):
         """Sets the path of a CA-Bundle to use for verifying requests
@@ -102,7 +110,7 @@ class DownstreamClient(object):
             self.requests_verify_arg = self.cert_path
         else:
             self.requests_verify_arg = False
-
+            
     def connect(self):
         """Connects to a downstream-node server.
         """
@@ -157,8 +165,8 @@ class DownstreamClient(object):
         # we can calculate farmer id for display...
         token = binascii.unhexlify(self.token)
         token_hash = hashlib.sha256(token).hexdigest()[:20]
-        print('Confirmed token: {0}'.format(self.token))
-        print('Farmer id: {0}'.format(token_hash))
+        self.logger.info('Confirmed token: {0}'.format(self.token))
+        self.logger.info('Farmer id: {0}'.format(token_hash))
 
     def _get_contracts(self, size=None):
         """Gets chunk contracts from the connected node
@@ -188,7 +196,7 @@ class DownstreamClient(object):
             
             for k in ['file_hash', 'seed', 'size', 'challenge', 'tag', 'due']:
                 if (k not in chunk):
-                    print('Malformed chunk sent from server.')
+                    self.logger.warn('Malformed chunk sent from server.')
                     continue
 
             contract = DownstreamContract(
@@ -281,6 +289,21 @@ class DownstreamClient(object):
         else:
             return max_obtainable_size
 
+    def _update_contract_stats(self):
+        total_size = self.get_total_size()
+        contracts = self.contract_count()
+        fill_ratio = '{0}/{1}'.format(sizeof_fmt(total_size),
+                                      sizeof_fmt(self.desired_size))
+        fraction = float(total_size) / float(self.desired_size)
+        fill_percent = '{0}%'.format(round(fraction * 100.0, 3))
+        self.thread_manager.stats.set(
+            'filled', '{0} ({1})'.format(fill_ratio,fill_percent))
+        self.thread_manager.stats.set('contracts', contracts)
+        self.thread_manager.stats.set('space_bar', fraction)
+        self.logger.info('Contracts: {0}, Total size: {1}'.
+              format(contracts,fill_ratio))
+        self.logger.info('Capacity filled {0}'.format(fill_percent))
+            
     def _run_contract_manager(self, retry=False):
         """This loop will maintain the desired total contract size, if
         possible
@@ -290,14 +313,14 @@ class DownstreamClient(object):
         while (self.thread_manager.running):
             size_to_fill = self._size_to_fill()
             while (self.thread_manager.running and size_to_fill > 0):
-                print('Requesting chunks to fill {0}'
-                      .format(sizeof_fmt(size_to_fill)))
+                self.logger.info('Requesting chunks to fill {0}'
+                            .format(sizeof_fmt(size_to_fill)))
                 try:
                     contracts = self._get_contracts(size_to_fill)
                 except DownstreamError as ex:
                     if (retry):
-                        print('Get contracts failed: {0}, retrying'
-                              .format(str(ex)))
+                        self.logger.error('Get contracts failed: {0}, retrying'
+                                    .format(str(ex)))
                         continue
                     else:
                         raise
@@ -305,21 +328,18 @@ class DownstreamClient(object):
                 if (obtained_size > size_to_fill):
                     raise DownstreamError('Server sent too much chunk data,' 
                                           'size exceeded. Rejecting data.')
-                print('Obtained {0} contracts for a total size of {1}'.format(
+                self.logger.info('Obtained {0} contracts for a total size of {1}'.format(
                     len(contracts), sizeof_fmt(obtained_size)))
                 if (len(contracts) > 0):
                     for contract in contracts:
+                        self._update_contract_stats()
                         self._add_contract(contract)
                         # and begin proving this contract
                         self._prove_async(contract)
-                    print('Contracts: {0}, Total size: {1}/{2}'.
-                          format(self.contract_count(),
-                                 sizeof_fmt(self.get_total_size()),
-                                 sizeof_fmt(self.desired_size)))
-                    print('Capacity filled {0}%'.format(
-                        round(float(self.get_total_size()) /
-                              float(self.desired_size) * 100.0, 3)))
+                        if (not self.thread_manager.running):
+                            break
                 else:
+                    self.logger.info('There were no chunks available on the server.')
                     break
 
                 size_to_fill = self._size_to_fill()
@@ -328,8 +348,7 @@ class DownstreamClient(object):
                 # we already exited.  contract_manager needs to return now
                 break
             # wait until we need to obtain a new contract
-            if (not online_already):
-                print('Your farmer is online.')
+            if (not online_already):                
                 online_already = True
             self.contract_thread.wait(30)
 
@@ -337,6 +356,7 @@ class DownstreamClient(object):
                 and self.heartbeat_count >= self.desired_heartbeats):
                 # signal a shutdown, and return
                 print('Heartbeat number requirement met.')
+                self.logger.info('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
                 break
 
@@ -352,11 +372,13 @@ class DownstreamClient(object):
         proof queue
         """
         try:
-            proven = contract.update_proof()
+            with self.proving_counter():
+                proven = contract.update_proof()
         except DownstreamError as ex:
-            print('Unable to fulfill contract: {0}'.format(str(ex)))
+            self.logger.warn('Unable to fulfill contract: {0}'.format(str(ex)))
             self._remove_contract(contract)
             return
+            
 
         if (proven):
             submission_time = (contract.expiration 
@@ -364,8 +386,8 @@ class DownstreamClient(object):
             #print('Putting {0} into submission queue.'.format(contract))
             self.submission_queue.put(contract, submission_time)
         else:
-            print('Proof for contract {0} was not available.'
-                  .format(contract))
+            self.logger.warn('Proof for contract {0} was not available.'
+                        .format(contract))
 
         self.heartbeat_thread.wake()
     
@@ -374,78 +396,79 @@ class DownstreamClient(object):
     
     def _submit(self, contracts):
         """Submits the specified contracts
-        """
-        start = time.clock()
-        
-        url = '{0}/answer/{1}'.format(self.api_url,
-                                      self.token)
-
-        proofs = [c.proof_data for c in contracts]
-        contract_dict = {c.hash: c for c in contracts}
-        
+        """        
+        with self.submitting_counter(len(contracts)):
+            start = time.clock()
             
-        data = {
-            'proofs': proofs
-        }
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            resp = requests.post(url,
-                                 data=json.dumps(data),
-                                 headers=headers,
-                                 verify=self.requests_verify_arg)
-        except:
-            raise DownstreamError('Unable to perform HTTP post.')
+            url = '{0}/answer/{1}'.format(self.api_url,
+                                          self.token)
 
-        try:
-            r_json = handle_json_response(resp)
-        except DownstreamError as ex:
-            raise DownstreamError(
-                'Challenge answer failed: {0}'.format(str(ex)))
-
-        if ('report' not in r_json or not isinstance(r_json['report'], list)):
-            raise DownstreamError('Malformed response from server.')
-
-        submitted = set()
+            proofs = [c.proof_data for c in contracts]
+            contract_dict = {c.hash: c for c in contracts}
             
-        for contract_report in r_json['report']:
-            if ('file_hash' not in contract_report
-                or contract_report['file_hash'] not in contract_dict):
-                # fail nicely with a malformed contract report
-                print('Warning: Unexpected contract report.')
-                continue
-            
-            contract = contract_dict[contract_report['file_hash']]
                 
-            if ('error' in contract_report):
-                print('Error answering challenge for contract{0}: {1}, '
-                      .format(contract, contract_report['error']))
-                continue
-            if ('status' not in contract_report or contract_report['status'] != 'ok'):
-                print('No status for contract {0}'
-                      .format(contract))
-                continue
+            data = {
+                'proofs': proofs
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
             
-            # everything seems to be in order for this contract
-            # and now, once a new challenge is obtained, this contract can 
-            # be answered again
-            contract.answered = True
-            submitted.add(contract)
-            with self.heartbeat_count_lock:
-                self.heartbeat_count += 1
-                if (self.desired_heartbeats is not None):
-                    self.contract_thread.wake()
-        
-        stop=time.clock()
-        print('Submitted {0} proofs successfully in {1} seconds'.format(len(submitted), round(stop-start,3)))
+            try:
+                resp = requests.post(url,
+                                     data=json.dumps(data),
+                                     headers=headers,
+                                     verify=self.requests_verify_arg)
+            except:
+                raise DownstreamError('Unable to perform HTTP post.')
+
+            try:
+                r_json = handle_json_response(resp)
+            except DownstreamError as ex:
+                raise DownstreamError(
+                    'Challenge answer failed: {0}'.format(str(ex)))
+
+            if ('report' not in r_json or not isinstance(r_json['report'], list)):
+                raise DownstreamError('Malformed response from server.')
+
+            submitted = set()
+                
+            for contract_report in r_json['report']:
+                if ('file_hash' not in contract_report
+                    or contract_report['file_hash'] not in contract_dict):
+                    # fail nicely with a malformed contract report
+                    self.logger.warn('Unexpected contract report.')
+                    continue
+                
+                contract = contract_dict[contract_report['file_hash']]
+                    
+                if ('error' in contract_report):
+                    self.logger.error('Error answering challenge for contract{0}: {1}, '
+                                 .format(contract, contract_report['error']))
+                    continue
+                if ('status' not in contract_report or contract_report['status'] != 'ok'):
+                    self.logger.error('No status for contract {0}'
+                                 .format(contract))
+                    continue
+                
+                # everything seems to be in order for this contract
+                # and now, once a new challenge is obtained, this contract can 
+                # be answered again
+                contract.answered = True
+                submitted.add(contract)
+                with self.heartbeat_count_lock:
+                    self.heartbeat_count += 1
+                    if (self.desired_heartbeats is not None):
+                        self.contract_thread.wake()
+            
+            stop=time.clock()
+            self.logger.info('Submitted {0} proofs successfully in {1} seconds'.format(len(submitted), round(stop-start,3)))
         
         # place submitted proofs in update queue
         for c in contracts:
             if (c not in submitted):
-                print('Contract {0} not successfully submitted, dropping'
-                      .format(c))
+                self.logger.error('Contract {0} not successfully submitted, dropping'
+                             .format(c))
                 self._remove_contract(c)
             else:
                 #print('Putting {0} into update queue.'.format(c))
@@ -461,81 +484,81 @@ class DownstreamClient(object):
         self.worker_pool.put_work(self._update, (contracts, ))
     
     def _update(self, contracts):
-        
-        start=time.clock()
-        
-        hashes = [c.hash for c in contracts]
-        
-        url = '{0}/challenge/{1}'.format(self.api_url,
-                                         self.token)
-                                         
-        data = {
-            'hashes': hashes
-        }
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        try:
-            resp = requests.post(url,
-                                 data=json.dumps(data),
-                                 headers=headers,
-                                 verify=self.requests_verify_arg)
-        except:
-            raise DownstreamError('Unable to perform HTTP post.')
-
-        try:
-            r_json = handle_json_response(resp)
-        except DownstreamError:
-            raise DownstreamError('Challenge update failed.')
-
-        if 'challenges' not in r_json:
-            raise DownstreamError('Malformed response from server.')
+        with self.updating_counter(len(contracts)):
+            start=time.clock()
             
-        # challenges is in r_json
-        challenges = r_json['challenges']
-        updated = set()
-
-        for challenge in challenges:
-            if ('file_hash' not in challenge):
-                raise DownstreamError('Malformed response from server.')            
+            hashes = [c.hash for c in contracts]
             
+            url = '{0}/challenge/{1}'.format(self.api_url,
+                                             self.token)
+                                             
+            data = {
+                'hashes': hashes
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
             try:
-                contract = self.contracts[challenge['file_hash']]
-            except KeyError:
-                print('Warning: Unexpected challenge update.')
-                continue
-            
-            if ('error' in challenge or 'status' in challenge):
-                if 'error' in challenge:
-                    message = challenge['error']
-                else:
-                    message = challenge['status']
-                print('Couldn\'t update contract {0}: {1}'
-                      .format(contract, message))
-                continue
-            
-            for k in ['challenge', 'due', 'answered']:
-                if (k not in challenge):
-                    print('Warning: Malformed challenge for contract {0}'
-                          .format(contract))
+                resp = requests.post(url,
+                                     data=json.dumps(data),
+                                     headers=headers,
+                                     verify=self.requests_verify_arg)
+            except:
+                raise DownstreamError('Unable to perform HTTP post.')
+
+            try:
+                r_json = handle_json_response(resp)
+            except DownstreamError:
+                raise DownstreamError('Challenge update failed.')
+
+            if 'challenges' not in r_json:
+                raise DownstreamError('Malformed response from server.')
+                
+            # challenges is in r_json
+            challenges = r_json['challenges']
+            updated = set()
+
+            for challenge in challenges:
+                if ('file_hash' not in challenge):
+                    raise DownstreamError('Malformed response from server.')            
+                
+                try:
+                    contract = self.contracts[challenge['file_hash']]
+                except KeyError:
+                    self.logger.warn('Unexpected challenge update.')
                     continue
+                
+                if ('error' in challenge or 'status' in challenge):
+                    if 'error' in challenge:
+                        message = challenge['error']
+                    else:
+                        message = challenge['status']
+                    self.logger.error('Couldn\'t update contract {0}: {1}'
+                                 .format(contract, message))
+                    continue
+                
+                for k in ['challenge', 'due', 'answered']:
+                    if (k not in challenge):
+                        self.logger.error('Malformed challenge for contract {0}'
+                                    .format(contract))
+                        continue
+                
+                contract.challenge = self.heartbeat.challenge_type().\
+                    fromdict(challenge['challenge'])
+                contract.expiration = datetime.utcnow()\
+                    + timedelta(seconds=int(challenge['due']))
+                contract.answered = challenge['answered']
+                
+                updated.add(contract)
             
-            contract.challenge = self.heartbeat.challenge_type().\
-                fromdict(challenge['challenge'])
-            contract.expiration = datetime.utcnow()\
-                + timedelta(seconds=int(challenge['due']))
-            contract.answered = challenge['answered']
-            
-            updated.add(contract)
-        
-        stop=time.clock()
-        print('Updated {0} contracts in {1} seconds'
-              .format(len(updated), round(stop-start,3)))
+            stop=time.clock()
+            self.logger.info('Updated {0} contracts in {1} seconds'
+                        .format(len(updated), round(stop-start,3)))
 
         for c in contracts:
             if (c not in updated):
-                print('Contract {0} not updated, dropping'
-                      .format(c))
+                self.logger.error('Contract {0} not updated, dropping'
+                             .format(c))
                 self._remove_contract(c)
             else:
                 self._prove_async(c)
@@ -553,14 +576,27 @@ class DownstreamClient(object):
             contracts_to_submit = self.submission_queue.get()
             
             if (len(contracts_to_submit) > 0):
-                print('Submitting {0} contracts'.format(len(contracts_to_submit)))
+                self.logger.info('Submitting {0} contracts'.format(len(contracts_to_submit)))
                 self._submit_async(contracts_to_submit)
             
             contracts_to_update = self.update_queue.get()
             
             if (len(contracts_to_update) > 0):
-                print('Updating {0} contracts'.format(len(contracts_to_update)))
+                self.logger.info('Updating {0} contracts'.format(len(contracts_to_update)))
                 self._update_async(contracts_to_update)
+            
+            self.thread_manager.stats.set('uptime', datetime.utcnow()-self.start)
+            
+            self.thread_manager.stats.set('updating', self.updating_counter.count)
+            self.thread_manager.stats.set('submitting', self.submitting_counter.count)
+            self.thread_manager.stats.set('proving', self.proving_counter.count)
+
+            worker_load = '{0}%'.format(round(self.worker_pool.calculate_loading()*100.0, 3))
+            worker_count = self.worker_pool.thread_count()
+            max_load = '{0}%'.format(round(self.worker_pool.max_load()*100.0, 3))
+            self.thread_manager.stats.set('worker_threads', worker_count)
+            self.thread_manager.stats.set('avg_load', worker_load)
+            self.thread_manager.stats.set('max_load', max_load)
             
             next = [self.submission_queue.next_due(),
                     self.update_queue.next_due()]
@@ -583,6 +619,7 @@ class DownstreamClient(object):
         """
         self.heartbeat_count = 0
         self.desired_heartbeats = number
+        self.start = datetime.utcnow()
         
         # create the contract manager
         self.contract_thread = self.thread_manager.create_thread(

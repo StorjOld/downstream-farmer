@@ -15,7 +15,8 @@ install_requirements = [
     'requests',
     'RandomIO',
     'storj-heartbeat',
-    'siggy'
+    'siggy',
+    'colorama'
 ]
 
 test_requirements = [

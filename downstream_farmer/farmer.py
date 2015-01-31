@@ -2,9 +2,11 @@ import siggy
 import os
 import six
 import sys
+import logging
 from .utils import resource_path, restore, save, ShellApplication
 from .client import DownstreamClient
 from .exc import DownstreamError
+from .cli_stats import FarmerCLIStats
 
 
 class Farmer(ShellApplication):
@@ -30,7 +32,13 @@ class Farmer(ShellApplication):
         :param args: the arguments from the command line
         """
         ShellApplication.__init__(self)
-
+        
+        self.set_up_logging(args)
+        
+        cli_stats = FarmerCLIStats()
+        cli_stats.init()
+        self.set_clistats(cli_stats)
+        
         self.cert_path = resource_path('ca-bundle.crt')
         self.verify_cert = not args.ssl_no_verify
 
@@ -60,15 +68,20 @@ class Farmer(ShellApplication):
                 'Must specify farming address if one is not available.')
 
         if (self.token is not None):
-            print('Using token {0}'.format(self.token))
+            self.logger.info('Using token {0}'.format(self.token))
 
         if (self.address is not None):
-            print('Farming on address {0}'.format(self.address))
+            self.logger.info('Farming on address {0}'.format(self.address))
 
+    def set_up_logging(self, args):        
+        path = os.path.abspath(args.log_path)
+        logging.basicConfig(filename=path, level=logging.DEBUG)
+        self.logger = logging.getLogger('storj.downstream_farmer')
+            
     def prepare_chunk_dir(self):
         try:
             if (not os.path.isdir(self.chunk_dir)):
-                print('Creating directory {0}'.format(
+                self.logger.debug('Creating directory {0}'.format(
                     os.path.abspath(self.chunk_dir)))
                 os.mkdir(self.chunk_dir)
         except:
@@ -106,7 +119,8 @@ class Farmer(ShellApplication):
             url = args.node_url
 
         self.url = url.strip('/')
-        print('Using url {0}'.format(self.url))
+        self.logger.info('Using url {0}'.format(self.url))
+        self.stats.set('node_url', self.url)
 
         self.check_connectivity()
 
@@ -126,8 +140,8 @@ class Farmer(ShellApplication):
 
         if (args.forcenew):
             if (self.token is not None):
-                print('Not using token {0} since '
-                      'forcenew was specified.'.format(self.token))
+                self.logger.info('Not using token {0} since '
+                            'forcenew was specified.'.format(self.token))
                 self.token = None
 
     def load_address(self, args):
@@ -140,7 +154,7 @@ class Farmer(ShellApplication):
         if (args.address is not None):
             self.address = args.address
             if (self.address != saved_address):
-                print('New address specified, obtaining new token.')
+                self.logger.info('New address specified, obtaining new token.')
                 self.token = None
         else:
             self.address = saved_address
@@ -196,6 +210,7 @@ class Farmer(ShellApplication):
             raise DownstreamError("Could not connect to server.")
 
     def run(self, reconnect=False):
+        self.logger.info('Farmer started')
         self.client = DownstreamClient(
             self.url, self.token, self.address,
             self.size, self.message, self.signature,
@@ -210,8 +225,8 @@ class Farmer(ShellApplication):
             if (str(ex) == 'Unable to connect: Nonexistent token.'):
                 # token didn't exist on the server... clear token
                 # and try again
-                print('Given token did not exist on remote server. '
-                      'Attempting to obtain a new token.')
+                self.logger.warn('Given token did not exist on remote server. '
+                            'Attempting to obtain a new token.')
                 self.client.token = None
                 self.client.connect()
             else:

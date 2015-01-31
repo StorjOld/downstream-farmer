@@ -10,6 +10,7 @@ import signal
 import json
 import threading
 import time
+import logging
 
 from collections import deque
 from queue import Queue
@@ -17,6 +18,7 @@ from datetime import datetime
 
 from .exc import DownstreamError
 
+logger = logging.getLogger('storj.downstream_farmer.utils')
 
 def urlify(string):
     """ You might be wondering: why is this here at all, since it's basically
@@ -52,7 +54,7 @@ def handle_json_response(resp):
         except:
             # if not, just raise the regular http error
             # dump error:
-            print(resp)
+            logger.debug(resp)
             resp.raise_for_status()
         else:
             raise DownstreamError(message)
@@ -147,12 +149,14 @@ class ThreadManager(object):
     def __init__(self):
         self.threads = list()
         self.shutting_down = threading.Event()
+        self.logger = logging.getLogger('storj.downstream_farmer.utils.ThreadManager')
 
     def signal_shutdown(self):
         """Can be called from any thread, signals for a shutdown to occur.
         """
         if (self.running):
             print('Shutting down...')
+            self.logger.debug('Shutting down.')
         self.shutting_down.set()
         # wake all the child thread if they are waiting on a signal
         for t in self.threads:
@@ -187,11 +191,11 @@ class ThreadManager(object):
 
     def _child_wrapper(self, target=None, args=(), kwargs={}):
         try:
-            print('Starting {0}'.format(threading.current_thread()))
+            self.logger.debug('Starting {0}'.format(threading.current_thread()))
             target(*args, **kwargs)
-            print('{0} finished'.format(threading.current_thread()))
+            self.logger.debug('{0} finished'.format(threading.current_thread()))
         except:
-            traceback.print_exc()
+            self.logger.debug(traceback.format_exc())
             self.signal_shutdown()
 
     def create_thread(self, name=None, target=None, args=(), kwargs={}):
@@ -235,6 +239,7 @@ class WorkerThread(threading.Thread):
         A worker thread has an attached load tracker
         """
         threading.Thread.__init__(self, target=self._run)
+        self.logger = logging.getLogger('storj.downstream_farmer.utils.WorkerThread')
         self.daemon = True
         self.load_tracker = LoadTracker()
         self.thread_pool = thread_pool
@@ -245,7 +250,7 @@ class WorkerThread(threading.Thread):
         It will zombify this thread.
         """
         self.running = False
-        
+    
     def _run(self):
         """this thread will run unmanaged, and so will die dirty when program
         closes.  therefore we use a monitor thread to make sure any
@@ -263,7 +268,7 @@ class WorkerThread(threading.Thread):
                 #print('{0} : starting work'.format(threading.current_thread()))
                 work()
             except:
-                traceback.print_exc()
+                self.logger.debug(traceback.format_exc())
                 self.thread_pool.thread_manager.signal_shutdown()
             #print('{0} : done working'.format(threading.current_thread()))
             self.thread_pool.tasks.task_done()
@@ -276,6 +281,7 @@ class ThreadPool(object):
         :param thread_manager: the thread manager to use
         :param thread_count: the number of workers to instantiate
         """
+        self.logger = logging.getLogger('storj.downstream_farmer.utils.ThreadPool')
         self.tasks = Queue()           
         self.thread_manager = thread_manager
         self.workers = list()
@@ -295,21 +301,21 @@ class ThreadPool(object):
     
     def _add_thread(self):
         # unmanaged worker threads
-        print('{0} : adding worker'.format(threading.current_thread()))
+        self.logger.debug('{0} : adding worker'.format(threading.current_thread()))
         worker = WorkerThread(self)
         with self.workers_lock:
             self.workers.append(worker)
-        return worker
+        return worker    
         
     def _remove_thread(self):
         with self.workers_lock:
             if (len(self.workers) > 1):
-                print('{0} : removing worker'.format(threading.current_thread()))
+                self.logger.debug('{0} : removing worker'.format(threading.current_thread()))
                 # make sure to retain one worker
                 thread = self.workers.popleft()
                 thread.stop()
     
-    def _calculate_loading(self):
+    def calculate_loading(self):
         total_time = 0
         work_time = 0
         #stats = list()
@@ -323,6 +329,15 @@ class ThreadPool(object):
         # print('ThreadPool worker stats: {0}'.format(', '.join(['{0}%'.format(round(a[0]/a[1]*100,1)) for a in stats])))
         return load
     
+    def max_load(self):
+        max = 0
+        with self.workers_lock:
+            for w in self.workers:
+                load = w.load_tracker.load()
+                if (load > max):
+                    max = load
+        return max
+    
     def check_loading(self):
         self.monitor_thread.wake()
     
@@ -334,17 +349,17 @@ class ThreadPool(object):
         # wait until shutdown is called
         while (self.thread_manager.running):
             # check loading every second to see if we should add another thread.
-            load = self._calculate_loading()
+            load = self.calculate_loading()
             if (load > self.load_maximum):
                 worker = self._add_thread()
                 worker.start()
             elif (load < self.load_minimum):
-                self._remove_thread()                        
+                self._remove_thread()
             self.thread_manager.sleep(10)
         # wait for any existing work to finish
-        print('MonitorThread waiting for tasks to finish')
+        self.logger.debug('MonitorThread waiting for tasks to finish')
         self.tasks.join()
-        print('MonitorThread finishing')
+        self.logger.debug('MonitorThread finishing')
         # now, managed thread can exit so program can close cleanly
     
     def put_work(self, target, args=[], kwargs={}):
@@ -374,6 +389,8 @@ class ShellApplication(ThreadManager):
         # register signals with application
         for sig in [signal.SIGTERM, signal.SIGINT]:
             signal.signal(sig, self.signal_handler)
+        
+        self.stats = None
 
     def signal_handler(self, signum=None, frame=None):
         """When called, exits the shell application.  Calls the shutdown
@@ -381,9 +398,58 @@ class ShellApplication(ThreadManager):
         """
         self.signal_shutdown()
 
-
+    def set_clistats(self, stats):
+        self.stats = stats
     
+    def wait_for_shutdown(self):
+        """Waits for a shutdown signal from the child threads
+        Should be run from the main thread
+        """
+        last = None
+        while (self.running):
+            # we have to sleep in order to receive sigint on windows
+            # this should work for linux too
+            # this is a 1 second polling solution.  not ideal.
+            # the other option would be to have the dying child threads
+            # send a kill signal when they fail
+            try:
+                if (self.stats is not None 
+                    and (last is None or last < (time.clock()-1))):
+                    last = time.clock()
+                    self.stats.update()
+                time.sleep(1)
+            except:
+                # when interrupted this sleep will raise the interrupted error
+                pass
+        self.finish()
+
+
+
+class Counter(object):
+    def __init__(self):
+        self.count = 0
+        self.lock = threading.Lock()
+    
+    def add(self, number):
+        with self.lock:
+            self.count += number
+    
+    def __call__(self, number=1):
+        return CounterContext(self, number)
+
         
+class CounterContext(object):
+    def __init__(self, counter, increment):
+        self.counter = counter
+        self.increment = increment
+
+    def __enter__(self):
+        self.counter.add(self.increment)
+        
+    def __exit__(self, type, value, traceback):
+        self.counter.add(-self.increment)   
+
+
         
 class WorkChunk(object):
 

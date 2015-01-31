@@ -5,11 +5,14 @@ from __future__ import print_function
 import os
 import sys
 import argparse
+import logging
+import traceback
 
 from .version import __version__
 from .exc import DownstreamError
 from .farmer import Farmer
 
+logger = logging.getLogger('storj.downstream_farmer')
 
 class SmartFormatter(argparse.HelpFormatter):
 
@@ -35,8 +38,10 @@ def eval_args(args):
         farmer.run(args.keepalive)
 
     except DownstreamError as e:
+        logger.error(traceback.format_exc())
         fail_exit('Error: {0}'.format(str(e)))
     except:
+        logger.error(traceback.format_exc())
         fail_exit('Unexpected error: {0}'.format(sys.exc_info()[1]))
 
 
@@ -46,6 +51,7 @@ def parse_args(args=None):
     chunk_path = os.path.join('data', 'chunks')
     default_size = 32768
     default_url = 'https://live.driveshare.org:8443'
+    log_path = 'farmer.log'
     parser = argparse.ArgumentParser(
         'downstream', formatter_class=SmartFormatter)
     parser.add_argument('-V', '--version', action='version',
@@ -100,6 +106,9 @@ def parse_args(args=None):
                         'upon failure.', action='store_true')
     parser.add_argument('--ssl-no-verify', help='Do not verify ssl '
                         'certificates.', action='store_true')
+    parser.add_argument('--log-path', help='Path to the log file.  Default is:'
+                        ' {0}'.format(log_path),
+                        default=log_path)
     return parser.parse_args(args)
 
 
