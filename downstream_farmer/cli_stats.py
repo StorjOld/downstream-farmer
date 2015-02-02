@@ -51,7 +51,7 @@ template = [
 '|                                                                             |',
 '|                                                                             |',
 '+-Performance Stats-----------------------------------------------------------+',
-'| Worker Threads :   0       Avg. Load :    0.0%       Max Load :    0.0%     |',
+'| Worker Threads : 0         Avg. Load : 0.0%          Max Load : 0.0%        |',
 '|                                                                             |',
 '+-Status----------------------------------------------------------------------+',
 '|                                                                             |',
@@ -132,13 +132,11 @@ class CLIStatusStream(object):
         self.field_name = field_name
         
     def write(self, data):
-        logger.debug('setting {0} with {1}'.format(self.field_name,data))
         data = data.rstrip()
         if (len(data) > 0):
             self.stats.set(self.field_name, data,flush=False)
 
     def flush(self):
-        logger.debug('flush called')
         self.stats.print_field(self.field_name)
         self.stats.reset_cursor()
         
