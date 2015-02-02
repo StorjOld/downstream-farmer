@@ -155,8 +155,7 @@ class ThreadManager(object):
         """Can be called from any thread, signals for a shutdown to occur.
         """
         if (self.running):
-            print('Shutting down...')
-            self.logger.debug('Shutting down.')
+            self.logger.info('Shutting down...')
         self.shutting_down.set()
         # wake all the child thread if they are waiting on a signal
         for t in self.threads:
@@ -413,10 +412,6 @@ class ShellApplication(ThreadManager):
             # the other option would be to have the dying child threads
             # send a kill signal when they fail
             try:
-                if (self.stats is not None 
-                    and (last is None or last < (time.clock()-1))):
-                    last = time.clock()
-                    self.stats.update()
                 time.sleep(1)
             except:
                 # when interrupted this sleep will raise the interrupted error

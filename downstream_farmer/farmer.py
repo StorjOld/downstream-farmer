@@ -6,7 +6,7 @@ import logging
 from .utils import resource_path, restore, save, ShellApplication
 from .client import DownstreamClient
 from .exc import DownstreamError
-from .cli_stats import FarmerCLIStats
+from .cli_stats import FarmerCLIStats, CLIStatusHandler
 
 
 class Farmer(ShellApplication):
@@ -38,6 +38,10 @@ class Farmer(ShellApplication):
         cli_stats = FarmerCLIStats()
         cli_stats.init()
         self.set_clistats(cli_stats)
+        
+        status_handler = CLIStatusHandler(cli_stats, 'status')
+        status_handler.setLevel(logging.INFO)
+        self.logger.addHandler(status_handler)
         
         self.cert_path = resource_path('ca-bundle.crt')
         self.verify_cert = not args.ssl_no_verify
@@ -72,6 +76,8 @@ class Farmer(ShellApplication):
 
         if (self.address is not None):
             self.logger.info('Farming on address {0}'.format(self.address))
+            
+        self.stats.set('sjcx_address',self.address)
 
     def set_up_logging(self, args):        
         path = os.path.abspath(args.log_path)

@@ -166,6 +166,7 @@ class DownstreamClient(object):
         token = binascii.unhexlify(self.token)
         token_hash = hashlib.sha256(token).hexdigest()[:20]
         self.logger.info('Confirmed token: {0}'.format(self.token))
+        self.thread_manager.stats.set('token',self.token)
         self.logger.info('Farmer id: {0}'.format(token_hash))
 
     def _get_contracts(self, size=None):
@@ -292,7 +293,7 @@ class DownstreamClient(object):
     def _update_contract_stats(self):
         total_size = self.get_total_size()
         contracts = self.contract_count()
-        fill_ratio = '{0}/{1}'.format(sizeof_fmt(total_size),
+        fill_ratio = '{0} / {1}'.format(sizeof_fmt(total_size),
                                       sizeof_fmt(self.desired_size))
         fraction = float(total_size) / float(self.desired_size)
         fill_percent = '{0}%'.format(round(fraction * 100.0, 3))
@@ -458,6 +459,7 @@ class DownstreamClient(object):
                 submitted.add(contract)
                 with self.heartbeat_count_lock:
                     self.heartbeat_count += 1
+                    self.thread_manager.stats.set('heartbeats',self.heartbeat_count)
                     if (self.desired_heartbeats is not None):
                         self.contract_thread.wake()
             
