@@ -216,7 +216,7 @@ class DownstreamClient(object):
 
     def get_total_size(self):
         with self.contracts_lock:
-            if (len(self.contracts > 0)):
+            if (len(self.contracts) > 0):
                 return sum([c.size for c in self.contracts.values()])
             else:
                 return 0
