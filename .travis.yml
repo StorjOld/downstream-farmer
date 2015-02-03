@@ -16,7 +16,7 @@ before_install:
 install:
   - "pip install coverage coveralls"
   - "python setup.py install"
-  - "git clone https://github.com/storj/downstream-node.git node"
+  - "git clone https://github.com/wiggzz/downstream-node.git node"
   - "cd node ; pip install -r requirements.txt ."
   - "mkdir data && cd data"
   - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
@@ -27,7 +27,7 @@ before_script:
   - 'mysql -e "create database if not exists downstream;" -u root'
   - "cd node"
   - "python runapp.py --initdb"
-  - "python runapp.py --generate-chunk 100"
+  - "python runapp.py --generate-chunk 32768"
   - 'mysql downstream -e "insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
   - "nohup python runapp.py &"
   - "cd .."
