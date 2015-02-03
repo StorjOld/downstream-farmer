@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import sys
 import binascii
 import hashlib
 import json
@@ -89,6 +90,10 @@ class DownstreamClient(object):
         self.logger = logging.getLogger(
             'storj.downstream_farmer.DownstreamClient')
         self.start = None
+
+        # this is the time the client will wait after a failed submission or
+        # update to resubmit
+        self.retry_interval = 3
 
     def set_cert_path(self, cert_path):
         """Sets the path of a CA-Bundle to use for verifying requests
@@ -178,14 +183,13 @@ class DownstreamClient(object):
         if (size is not None):
             url += '/{0}'.format(size)
 
-        resp = requests.get(url, verify=self.requests_verify_arg)
-
         try:
+            resp = requests.get(url, verify=self.requests_verify_arg)
+
             r_json = handle_json_response(resp)
-        except DownstreamError as ex:
-            # can't handle an invalid token
-            raise DownstreamError('Unable to get token: {0}'.
-                                  format(str(ex)))
+        except:
+            raise DownstreamError('Unable to get contracts: {0}'.
+                                  format(str(sys.exc_info()[1])))
 
         if ('chunks' not in r_json or not isinstance(r_json['chunks'], list)):
             raise DownstreamError('Malformed response from server.')
@@ -328,6 +332,7 @@ class DownstreamClient(object):
                     if (retry):
                         self.logger.error('Get contracts failed: {0}, retrying'
                                           .format(str(ex)))
+                        self.thread_manager.sleep(3)
                         continue
                     else:
                         raise
@@ -405,91 +410,112 @@ class DownstreamClient(object):
     def _submit(self, contracts):
         """Submits the specified contracts
         """
-        with self.submitting_counter(len(contracts)):
-            start = time.clock()
+        try:
+            with self.submitting_counter(len(contracts)):
+                start = time.clock()
 
-            url = '{0}/answer/{1}'.format(self.api_url,
-                                          self.token)
+                url = '{0}/answer/{1}'.format(self.api_url,
+                                              self.token)
 
-            proofs = [c.proof_data for c in contracts]
-            contract_dict = {c.hash: c for c in contracts}
+                proofs = [c.proof_data for c in contracts]
+                contract_dict = {c.hash: c for c in contracts}
 
-            data = {
-                'proofs': proofs
-            }
-            headers = {
-                'Content-Type': 'application/json'
-            }
+                data = {
+                    'proofs': proofs
+                }
+                headers = {
+                    'Content-Type': 'application/json'
+                }
 
-            try:
-                resp = requests.post(url,
-                                     data=json.dumps(data),
-                                     headers=headers,
-                                     verify=self.requests_verify_arg)
-            except:
-                raise DownstreamError('Unable to perform HTTP post.')
+                try:
+                    resp = requests.post(url,
+                                         data=json.dumps(data),
+                                         headers=headers,
+                                         verify=self.requests_verify_arg)
+                except:
+                    raise DownstreamError('Unable to perform HTTP post.')
 
-            try:
-                r_json = handle_json_response(resp)
-            except DownstreamError as ex:
-                raise DownstreamError(
-                    'Challenge answer failed: {0}'.format(str(ex)))
+                try:
+                    r_json = handle_json_response(resp)
+                except:
+                    raise DownstreamError(
+                        'Challenge answer failed: {0}'
+                        .format(str(sys.exc_info()[1])))
 
-            if ('report' not in r_json or not isinstance(r_json['report'],
-                                                         list)):
-                raise DownstreamError('Malformed response from server.')
+                if ('report' not in r_json or not isinstance(r_json['report'],
+                                                             list)):
+                    raise DownstreamError('Malformed response from server.')
 
-            submitted = set()
+                submitted = set()
 
-            for contract_report in r_json['report']:
-                if ('file_hash' not in contract_report
-                        or contract_report['file_hash'] not in contract_dict):
-                    # fail nicely with a malformed contract report
-                    self.logger.warn('Unexpected contract report.')
-                    continue
+                for contract_report in r_json['report']:
+                    if ('file_hash' not in contract_report
+                            or contract_report['file_hash']
+                            not in contract_dict):
+                        # fail nicely with a malformed contract report
+                        self.logger.warn('Unexpected contract report.')
+                        continue
 
-                contract = contract_dict[contract_report['file_hash']]
+                    contract = contract_dict[contract_report['file_hash']]
 
-                if ('error' in contract_report):
-                    self.logger.error('Error answering challenge for contract'
-                                      ' {0}: {1}, '
-                                      .format(contract,
-                                              contract_report['error']))
-                    continue
-                if ('status' not in contract_report
-                        or contract_report['status'] != 'ok'):
-                    self.logger.error('No status for contract {0}'
-                                      .format(contract))
-                    continue
+                    if ('error' in contract_report):
+                        self.logger.error('Error answering challenge for'
+                                          ' contract {0}: {1}, '
+                                          .format(contract,
+                                                  contract_report['error']))
+                        continue
+                    if ('status' not in contract_report
+                            or contract_report['status'] != 'ok'):
+                        self.logger.error('No status for contract {0}'
+                                          .format(contract))
+                        continue
 
-                # everything seems to be in order for this contract
-                # and now, once a new challenge is obtained, this contract can
-                # be answered again
-                contract.answered = True
-                submitted.add(contract)
-                with self.heartbeat_count_lock:
-                    self.heartbeat_count += 1
-                    self.thread_manager.stats.set(
-                        'heartbeats', self.heartbeat_count)
-                    if (self.desired_heartbeats is not None):
-                        self.contract_thread.wake()
+                    # everything seems to be in order for this contract
+                    # and now, once a new challenge is obtained, this contract
+                    # can be answered again
+                    contract.answered = True
+                    submitted.add(contract)
+                    with self.heartbeat_count_lock:
+                        self.heartbeat_count += 1
+                        self.thread_manager.stats.set(
+                            'heartbeats', self.heartbeat_count)
+                        if (self.desired_heartbeats is not None):
+                            self.contract_thread.wake()
 
-            stop = time.clock()
+                stop = time.clock()
+        except:
+            self.logger.error('Submission error: {0}'
+                              .format(sys.exc_info()[1]))
+            # we had an issue submitting these contracts
+            # we shall retry until they expire... then they'll
+            # get dropped
+            resubmission_time = datetime.utcnow() \
+                + timedelta(seconds=self.retry_interval)
+            for c in contracts:
+                if (c.expiration > resubmission_time):
+                    self.submission_queue.put(c, resubmission_time)
+                else:
+                    # contract expired, drop
+                    self.logger.error('Contract {0} expired, dropping'
+                                      .format(c))
+                    self._remove_contract(c)
+        else:
+            # no issues submitting bulk of the contracts
+            # place submitted proofs in update queue
+            for c in contracts:
+                if (c not in submitted):
+                    self.logger.error('Contract {0} not successfully '
+                                      'submitted, dropping'.format(c))
+                    self._remove_contract(c)
+                else:
+                    # print('Putting {0} into update queue.'.format(c))
+                    ready_time = c.expiration
+                    update_time = (c.expiration
+                                   + timedelta(seconds=self.update_margin))
+                    self.update_queue.put(c, update_time, ready_time)
+
             self.logger.info('Submitted {0} proofs successfully in {1} seconds'
                              .format(len(submitted), round(stop - start, 3)))
-
-        # place submitted proofs in update queue
-        for c in contracts:
-            if (c not in submitted):
-                self.logger.error('Contract {0} not successfully submitted, '
-                                  'dropping'.format(c))
-                self._remove_contract(c)
-            else:
-                # print('Putting {0} into update queue.'.format(c))
-                ready_time = c.expiration
-                update_time = (c.expiration
-                               + timedelta(seconds=self.update_margin))
-                self.update_queue.put(c, update_time, ready_time)
 
         # and wake heartbeat manager again
         self.heartbeat_thread.wake()
@@ -498,85 +524,106 @@ class DownstreamClient(object):
         self.worker_pool.put_work(self._update, (contracts, ))
 
     def _update(self, contracts):
-        with self.updating_counter(len(contracts)):
-            start = time.clock()
+        try:
+            with self.updating_counter(len(contracts)):
+                start = time.clock()
 
-            hashes = [c.hash for c in contracts]
+                hashes = [c.hash for c in contracts]
 
-            url = '{0}/challenge/{1}'.format(self.api_url,
-                                             self.token)
+                url = '{0}/challenge/{1}'.format(self.api_url,
+                                                 self.token)
 
-            data = {
-                'hashes': hashes
-            }
-            headers = {
-                'Content-Type': 'application/json'
-            }
-            try:
-                resp = requests.post(url,
-                                     data=json.dumps(data),
-                                     headers=headers,
-                                     verify=self.requests_verify_arg)
-            except:
-                raise DownstreamError('Unable to perform HTTP post.')
-
-            try:
-                r_json = handle_json_response(resp)
-            except DownstreamError:
-                raise DownstreamError('Challenge update failed.')
-
-            if 'challenges' not in r_json:
-                raise DownstreamError('Malformed response from server.')
-
-            # challenges is in r_json
-            challenges = r_json['challenges']
-            updated = set()
-
-            for challenge in challenges:
-                if ('file_hash' not in challenge):
-                    raise DownstreamError('Malformed response from server.')
+                data = {
+                    'hashes': hashes
+                }
+                headers = {
+                    'Content-Type': 'application/json'
+                }
+                try:
+                    resp = requests.post(url,
+                                         data=json.dumps(data),
+                                         headers=headers,
+                                         verify=self.requests_verify_arg)
+                except:
+                    raise DownstreamError('Unable to perform HTTP post.')
 
                 try:
-                    contract = self.contracts[challenge['file_hash']]
-                except KeyError:
-                    self.logger.warn('Unexpected challenge update.')
-                    continue
+                    r_json = handle_json_response(resp)
+                except:
+                    raise DownstreamError('Challenge update failed.')
 
-                if ('error' in challenge or 'status' in challenge):
-                    if 'error' in challenge:
-                        message = challenge['error']
-                    else:
-                        message = challenge['status']
-                    self.logger.error('Couldn\'t update contract {0}: {1}'
-                                      .format(contract, message))
-                    continue
+                if 'challenges' not in r_json:
+                    raise DownstreamError('Malformed response from server.')
 
-                for k in ['challenge', 'due', 'answered']:
-                    if (k not in challenge):
-                        self.logger.error(
-                            'Malformed challenge for contract {0}'
-                            .format(contract))
+                # challenges is in r_json
+                challenges = r_json['challenges']
+                updated = set()
+
+                for challenge in challenges:
+                    if ('file_hash' not in challenge):
+                        raise DownstreamError(
+                            'Malformed response from server.')
+
+                    try:
+                        contract = self.contracts[challenge['file_hash']]
+                    except KeyError:
+                        self.logger.warn('Unexpected challenge update.')
                         continue
 
-                contract.challenge = self.heartbeat.challenge_type().\
-                    fromdict(challenge['challenge'])
-                contract.expiration = datetime.utcnow()\
-                    + timedelta(seconds=int(challenge['due']))
-                contract.answered = challenge['answered']
+                    if ('error' in challenge or 'status' in challenge):
+                        if 'error' in challenge:
+                            message = challenge['error']
+                        else:
+                            message = challenge['status']
+                        self.logger.error('Couldn\'t update contract {0}: {1}'
+                                          .format(contract, message))
+                        continue
 
-                updated.add(contract)
+                    for k in ['challenge', 'due', 'answered']:
+                        if (k not in challenge):
+                            self.logger.error(
+                                'Malformed challenge for contract {0}'
+                                .format(contract))
+                            continue
 
-            stop = time.clock()
+                    contract.challenge = self.heartbeat.challenge_type().\
+                        fromdict(challenge['challenge'])
+                    contract.expiration = datetime.utcnow()\
+                        + timedelta(seconds=int(challenge['due']))
+                    contract.answered = challenge['answered']
+
+                    updated.add(contract)
+
+                stop = time.clock()
+        except:
+            # some issue updating... retry
+            self.logger.error('Update error: {0}'.format(sys.exc_info()[1]))
+            # we had an issue updating these contracts
+            # we shall retry until they expire... then they'll
+            # get dropped
+            reupdate_time = datetime.utcnow() \
+                + timedelta(seconds=self.retry_interval)
+            ready_time = datetime.utcnow()
+            for c in contracts:
+                if (c.expiration + c.estimated_interval > reupdate_time):
+                    self.update_queue.put(c, reupdate_time, ready_time)
+                else:
+                    # this contract is expired, drop it
+                    self.logger.error('Contract {0} expired, dropping'
+                                      .format(c))
+                    self._remove_contract(c)
+            self.heartbeat_thread.wake()
+        else:
+            for c in contracts:
+                if (c not in updated):
+                    self.logger.error('Contract {0} not updated, dropping'
+                                      .format(c))
+                    self._remove_contract(c)
+                else:
+                    self._prove_async(c)
+
             self.logger.info('Updated {0} contracts in {1} seconds'
                              .format(len(updated), round(stop - start, 3)))
-
-        for c in contracts:
-            if (c not in updated):
-                self.logger.error('Contract {0} not updated, dropping'
-                                  .format(c))
-                self._remove_contract(c)
-            else:
-                self._prove_async(c)
 
         # dont need to wake heartbeat manager because we didn't put anything
         # into a queue

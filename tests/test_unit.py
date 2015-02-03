@@ -880,7 +880,7 @@ class TestClient(unittest.TestCase):
             with self.assertRaises(DownstreamError) as ex:
                 self.client._get_contracts()
             self.assertEqual(
-                str(ex.exception), 'Unable to get token: test error')
+                str(ex.exception), 'Unable to get contracts: test error')
 
     def test_get_contract_malformed(self):
         with mock.patch('downstream_farmer.client.requests.get') as patch:
@@ -1142,7 +1142,7 @@ class TestShell(unittest.TestCase):
 
     def test_parse_args_size_default(self):
         args = shell.parse_args()
-        self.assertEqual(args.size, 32768)
+        self.assertEqual(args.size, 33554432)
 
     def test_parse_args_address(self):
         sys.argv.append('--address')

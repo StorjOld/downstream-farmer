@@ -104,7 +104,7 @@ class CLIStatusStream(object):
         self.field_name = field_name
 
     def write(self, data):
-        data = data.rstrip()
+        data = data.split('\n')[0]
         if (len(data) > 0):
             self.stats.set(self.field_name, data, flush=False)
 

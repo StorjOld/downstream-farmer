@@ -36,7 +36,7 @@ def eval_args(args):
     try:
         farmer = Farmer(args)
 
-        farmer.run(args.keepalive)
+        farmer.run(True)
 
     except DownstreamError as e:
         logger.error(traceback.format_exc())
@@ -50,7 +50,7 @@ def parse_args(args=None):
     history_path = os.path.join('data', 'history.json')
     identity_path = os.path.join('data', 'identities.json')
     chunk_path = os.path.join('data', 'chunks')
-    default_size = 32768
+    default_size = 33554432  # 32 MiB
     default_url = 'https://live.driveshare.org:8443'
     log_path = 'farmer.log'
     parser = argparse.ArgumentParser(
@@ -103,8 +103,6 @@ def parse_args(args=None):
     parser.add_argument('-d', '--data-directory', default=chunk_path,
                         help='Data directory to place file chunks.  By default'
                         ' {0}'.format(chunk_path))
-    parser.add_argument('-k', '--keepalive', help='Will attempt to reconnect '
-                        'upon failure.', action='store_true')
     parser.add_argument('--ssl-no-verify', help='Do not verify ssl '
                         'certificates.', action='store_true')
     parser.add_argument('--log-path', help='Path to the log file.  Default is:'

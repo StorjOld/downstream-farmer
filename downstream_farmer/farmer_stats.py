@@ -3,7 +3,7 @@ from .cli_stats import CLIStats, CLIField, CLIProgressBar
 template = [
     '+---------------------------Storj Downstream-Farmer---------------------------+',  # NOQA
     '| Connected Node :                                                            |',  # NOQA
-    '| Uptime         : 0:00:00.000000                                             |',  # NOQA
+    '| Uptime         : 0:00:00                                                    |',  # NOQA
     '| SJCX Address   :                                                            |',  # NOQA
     '| Token          :                                                            |',  # NOQA
     '| Heartbeats     : 0                                                          |',  # NOQA
