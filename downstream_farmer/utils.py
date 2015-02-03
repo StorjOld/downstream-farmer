@@ -342,7 +342,10 @@ class ThreadPool(object):
             for w in self.workers:
                 total_time += w.load_tracker.total_time()
                 work_time += w.load_tracker.work_time()
-        load = float(work_time) / float(total_time)
+        if (total_time > 0):
+            load = float(work_time) / float(total_time)
+        else:
+            load = 0
         return load
 
     def max_load(self):
@@ -524,7 +527,11 @@ class LoadTracker(object):
         return time.clock() - self.sample_start
 
     def load(self):
-        return float(self.work_time()) / float(self.total_time())
+        total = self.total_time()
+        if (total > 0):
+            return float(self.work_time()) / float(total)
+        else:
+            return 0
 
 
 class BurstQueueItem(object):
