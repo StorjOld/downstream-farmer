@@ -17,8 +17,10 @@ from queue import Queue
 from datetime import datetime
 
 from .exc import DownstreamError
+from .cli_stats import Stats
 
 logger = logging.getLogger('storj.downstream_farmer.utils')
+
 
 def urlify(string):
     """ You might be wondering: why is this here at all, since it's basically
@@ -105,10 +107,10 @@ def restore(path):
 
 def sizeof_fmt(num, suffix='B'):
     """
-    From: http://stackoverflow.com/questions/1094841/reusable-library-to-get-human-readable-version-of-file-size
+    From: http://stackoverflow.com/questions/1094841/reusable-library-to-get-human-readable-version-of-file-size  # NOQA
     Written by Fred Cirera
     """
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
@@ -131,11 +133,11 @@ class ManagedThread(threading.Thread):
         """This will wait until wake is called but no longer than the specified
         timeout.
         """
-        #timeout_string = 'indefinitely' if timeout is None \
+        # timeout_string = 'indefinitely' if timeout is None \
         #    else '{0} seconds'.format(timeout)
-        #print('Thread {0} sleeping {1}'.format(self, timeout_string))
+        # print('Thread {0} sleeping {1}'.format(self, timeout_string))
         self.attached_event.wait(timeout)
-        #print('Thread {0} awoken'.format(self))
+        # print('Thread {0} awoken'.format(self))
         # if wake is called now, it is ok, because the thread is already awake.
         self.attached_event.clear()
         # if wake is called now, the next wait call will not block
@@ -149,7 +151,8 @@ class ThreadManager(object):
     def __init__(self):
         self.threads = list()
         self.shutting_down = threading.Event()
-        self.logger = logging.getLogger('storj.downstream_farmer.utils.ThreadManager')
+        self.logger = logging.getLogger(
+            'storj.downstream_farmer.utils.ThreadManager')
 
     def signal_shutdown(self):
         """Can be called from any thread, signals for a shutdown to occur.
@@ -190,11 +193,14 @@ class ThreadManager(object):
 
     def _child_wrapper(self, target=None, args=(), kwargs={}):
         try:
-            self.logger.debug('Starting {0}'.format(threading.current_thread()))
+            self.logger.debug(
+                'Starting {0}'.format(threading.current_thread()))
             target(*args, **kwargs)
-            self.logger.debug('{0} finished'.format(threading.current_thread()))
+            self.logger.debug(
+                '{0} finished'.format(threading.current_thread()))
         except:
             self.logger.debug(traceback.format_exc())
+            self.logger.info(sys.exc_info()[1])
             self.signal_shutdown()
 
     def create_thread(self, name=None, target=None, args=(), kwargs={}):
@@ -203,6 +209,10 @@ class ThreadManager(object):
                                args=(target, args, kwargs))
         self.threads.append(thread)
         return thread
+
+    def called_every_second(self):
+        """This function is called every second the thread manager is running.
+        """
 
     def wait_for_shutdown(self):
         """Waits for a shutdown signal from the child threads
@@ -215,41 +225,46 @@ class ThreadManager(object):
             # the other option would be to have the dying child threads
             # send a kill signal when they fail
             try:
+                self.called_every_second()
                 time.sleep(1)
             except:
                 # when interrupted this sleep will raise the interrupted error
                 pass
         self.finish()
 
+
 class WorkItem(object):
+
     def __init__(self, target=None, args=[], kwargs={}):
         self.target = target
         self.args = args
         self.kwargs = kwargs
-        
+
     def __call__(self):
         self.target(*self.args, **self.kwargs)
 
 
 class WorkerThread(threading.Thread):
+
     def __init__(self, thread_pool=None):
         """Initializes the worker thread
 
         A worker thread has an attached load tracker
         """
         threading.Thread.__init__(self, target=self._run)
-        self.logger = logging.getLogger('storj.downstream_farmer.utils.WorkerThread')
+        self.logger = logging.getLogger(
+            'storj.downstream_farmer.utils.WorkerThread')
         self.daemon = True
         self.load_tracker = LoadTracker()
         self.thread_pool = thread_pool
         self.running = True
-        
+
     def stop(self):
         """Stops the worker thread after it finishes it's next batch of work
         It will zombify this thread.
         """
         self.running = False
-    
+
     def _run(self):
         """this thread will run unmanaged, and so will die dirty when program
         closes.  therefore we use a monitor thread to make sure any
@@ -257,35 +272,40 @@ class WorkerThread(threading.Thread):
         """
         self.load_tracker.start_work()
         while self.running:
-            #print('{0} : waiting on work'.format(threading.current_thread()))
-            
+            # print('{0} : waiting on work'.format(threading.current_thread()))
+
             self.load_tracker.finish_work()
-            #print('{0} : finished work, load: {1}%'.format(threading.current_thread(), round(self.load_tracker.load()*100.0, 2)))
+            # print('{0} : finished work, load: {1}%'.
+            #       format(threading.current_thread(),
+            #              round(self.load_tracker.load()*100.0, 2)))
             work = self.thread_pool.tasks.get()
             self.load_tracker.start_work()
             try:
-                #print('{0} : starting work'.format(threading.current_thread()))
+                # print('{0} : starting work'
+                #       .format(threading.current_thread()))
                 work()
             except:
                 self.logger.debug(traceback.format_exc())
                 self.thread_pool.thread_manager.signal_shutdown()
-            #print('{0} : done working'.format(threading.current_thread()))
+            # print('{0} : done working'.format(threading.current_thread()))
             self.thread_pool.tasks.task_done()
 
 
 class ThreadPool(object):
+
     def __init__(self, thread_manager, thread_count=10):
         """Initialization method
-        
+
         :param thread_manager: the thread manager to use
         :param thread_count: the number of workers to instantiate
         """
-        self.logger = logging.getLogger('storj.downstream_farmer.utils.ThreadPool')
-        self.tasks = Queue()           
+        self.logger = logging.getLogger(
+            'storj.downstream_farmer.utils.ThreadPool')
+        self.tasks = Queue()
         self.thread_manager = thread_manager
         self.workers = list()
         self.workers_lock = threading.Lock()
-        for i in range(0, thread_count):            
+        for i in range(0, thread_count):
             self._add_thread()
         # managed monitor thread
         self.monitor_thread = self.thread_manager.create_thread(
@@ -293,41 +313,39 @@ class ThreadPool(object):
             target=self._monitor)
         self.load_minimum = 0.01
         self.load_maximum = 0.25
-    
+
     def thread_count(self):
-        with self.workers_lock: 
+        with self.workers_lock:
             return len(self.workers)
-    
+
     def _add_thread(self):
         # unmanaged worker threads
-        self.logger.debug('{0} : adding worker'.format(threading.current_thread()))
+        self.logger.debug(
+            '{0} : adding worker'.format(threading.current_thread()))
         worker = WorkerThread(self)
         with self.workers_lock:
             self.workers.append(worker)
-        return worker    
-        
+        return worker
+
     def _remove_thread(self):
         with self.workers_lock:
             if (len(self.workers) > 1):
-                self.logger.debug('{0} : removing worker'.format(threading.current_thread()))
+                self.logger.debug(
+                    '{0} : removing worker'.format(threading.current_thread()))
                 # make sure to retain one worker
                 thread = self.workers.popleft()
                 thread.stop()
-    
+
     def calculate_loading(self):
         total_time = 0
         work_time = 0
-        #stats = list()
         with self.workers_lock:
             for w in self.workers:
                 total_time += w.load_tracker.total_time()
                 work_time += w.load_tracker.work_time()
-                #stats.append((work_time, total_time))
-        load = float(work_time)/float(total_time)
-        # print('ThreadPool loaded: {0}%'.format(round(load * 100.0, 2)))
-        # print('ThreadPool worker stats: {0}'.format(', '.join(['{0}%'.format(round(a[0]/a[1]*100,1)) for a in stats])))
+        load = float(work_time) / float(total_time)
         return load
-    
+
     def max_load(self):
         max = 0
         with self.workers_lock:
@@ -336,10 +354,10 @@ class ThreadPool(object):
                 if (load > max):
                     max = load
         return max
-    
+
     def check_loading(self):
         self.monitor_thread.wake()
-    
+
     def _monitor(self):
         """This runs until the thread manager wakes it up during
         shutdown, at which time it will wait for any unfinished work in the
@@ -347,7 +365,8 @@ class ThreadPool(object):
         """
         # wait until shutdown is called
         while (self.thread_manager.running):
-            # check loading every second to see if we should add another thread.
+            # check loading every second to see if we should add another
+            # thread.
             load = self.calculate_loading()
             if (load > self.load_maximum):
                 worker = self._add_thread()
@@ -360,13 +379,13 @@ class ThreadPool(object):
         self.tasks.join()
         self.logger.debug('MonitorThread finishing')
         # now, managed thread can exit so program can close cleanly
-    
+
     def put_work(self, target, args=[], kwargs={}):
         """Puts work in the work queue.
-        :param work: callable work object 
+        :param work: callable work object
         """
         self.tasks.put(WorkItem(target, args, kwargs))
-    
+
     def start(self):
         """Starts the thread pool and all its workers and the monitor thread
         """
@@ -374,7 +393,6 @@ class ThreadPool(object):
             for worker in self.workers:
                 worker.start()
         self.monitor_thread.start()
-        
 
 
 class ShellApplication(ThreadManager):
@@ -388,8 +406,8 @@ class ShellApplication(ThreadManager):
         # register signals with application
         for sig in [signal.SIGTERM, signal.SIGINT]:
             signal.signal(sig, self.signal_handler)
-        
-        self.stats = None
+
+        self.stats = Stats()
 
     def signal_handler(self, signum=None, frame=None):
         """When called, exits the shell application.  Calls the shutdown
@@ -397,55 +415,34 @@ class ShellApplication(ThreadManager):
         """
         self.signal_shutdown()
 
-    def set_clistats(self, stats):
-        self.stats = stats
-    
-    def wait_for_shutdown(self):
-        """Waits for a shutdown signal from the child threads
-        Should be run from the main thread
-        """
-        last = None
-        while (self.running):
-            # we have to sleep in order to receive sigint on windows
-            # this should work for linux too
-            # this is a 1 second polling solution.  not ideal.
-            # the other option would be to have the dying child threads
-            # send a kill signal when they fail
-            try:
-                time.sleep(1)
-            except:
-                # when interrupted this sleep will raise the interrupted error
-                pass
-        self.finish()
-
-
 
 class Counter(object):
+
     def __init__(self):
         self.count = 0
         self.lock = threading.Lock()
-    
+
     def add(self, number):
         with self.lock:
             self.count += number
-    
+
     def __call__(self, number=1):
         return CounterContext(self, number)
 
-        
+
 class CounterContext(object):
+
     def __init__(self, counter, increment):
         self.counter = counter
         self.increment = increment
 
     def __enter__(self):
         self.counter.add(self.increment)
-        
+
     def __exit__(self, type, value, traceback):
-        self.counter.add(-self.increment)   
+        self.counter.add(-self.increment)
 
 
-        
 class WorkChunk(object):
 
     """Encapsulates a chunk of work for the load tracker
@@ -532,15 +529,17 @@ class LoadTracker(object):
 
 
 class BurstQueueItem(object):
+
     """This class encapsulates an item that has a due date where where an
     activity must be performed on the item before that due date, but after
     the earliest time specified.
-    
+
     The due date indicates that the action must be performed as soon as
     possible, while ready indicates whether the action can be performed.
     basically, it can be performed any time between earliest and the due
     date, but must be performed soon after the due date
     """
+
     def __init__(self, item, due, earliest=None):
         self.item = item
         self.due = due
@@ -548,7 +547,7 @@ class BurstQueueItem(object):
 
     def is_due(self):
         return self.due < datetime.utcnow()
-        
+
     def is_ready(self):
         if (self.earliest is None):
             return True
@@ -556,22 +555,24 @@ class BurstQueueItem(object):
 
 
 class BurstQueue(object):
+
     """
     This class will help us perform heartbeats in a timely manner.
-    
-    Items can be placed in this queue.  Items have a 'due date' 
+
+    Items can be placed in this queue.  Items have a 'due date'
     When `get` is called, it either returns an empty list if there are
     no due items, or if there are any due items, it will return
     all the items in the queue that are ready.
     """
+
     def __init__(self):
         self.queue = deque()
         self.queue_lock = threading.Lock()
-    
+
     def put(self, item, due, earliest=None):
         with self.queue_lock:
             self.queue.append(BurstQueueItem(item, due, earliest))
-        
+
     def get(self):
         """Gets the list of ready items if any items are due"""
         if (self._any_due()):
@@ -587,7 +588,7 @@ class BurstQueue(object):
                 return ready_items
         else:
             return list()
-        
+
     def next_due(self):
         """Gets the next due time
         """
@@ -597,7 +598,7 @@ class BurstQueue(object):
                 if (earliest is None or queue_item.due < earliest):
                     earliest = queue_item.due
         return earliest
-    
+
     def _any_due(self):
         """Returns whether any items are due
         """
@@ -606,4 +607,3 @@ class BurstQueue(object):
                 if (queue_item.is_due()):
                     return True
         return False
-            

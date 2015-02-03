@@ -325,6 +325,7 @@ class TestFarmer(unittest.TestCase):
         self.test_args.forcenew = False
         self.test_args.identity = 'identityfile'
         self.test_args.data_directory = os.path.join('data', 'chunks')
+        self.test_args.log_path = 'testlog'
 
     def tearDown(self):
         pass
@@ -567,7 +568,8 @@ class TestFarmer(unittest.TestCase):
                 '',
                 farmer,
                 farmer.chunk_dir)
-            patch.return_value.run_async.assert_called_with(True, farmer.number)
+            patch.return_value.run_async.assert_called_with(
+                True, farmer.number)
             self.assertTrue(w.called)
             self.assertTrue(patch.return_value.connect.called)
             self.assertEqual(farmer
@@ -637,7 +639,9 @@ class TestContract(unittest.TestCase):
 
     def setUp(self):
         self.challenge = Heartbeat.challenge_type().\
-            fromdict(MockValues.get_challenges_response['challenges'][0]['challenge'])
+            fromdict(
+                MockValues
+                .get_challenges_response['challenges'][0]['challenge'])
         self.heartbeat = Heartbeat.fromdict(
             MockValues.connect_response['heartbeat'])
         self.tag = Heartbeat.tag_type().fromdict(
@@ -677,6 +681,7 @@ class TestContract(unittest.TestCase):
 
     def test_repr(self):
         self.assertEqual(str(self.contract), self.contract.hash)
+
 
 class MockContractShutdown(object):
 
@@ -729,7 +734,7 @@ class TestClient(unittest.TestCase):
         self.token = binascii.hexlify(os.urandom(16)).decode('ascii')
         self.msg = ''
         self.sig = ''
-        self.thread_manager = ThreadManager()
+        self.thread_manager = ShellApplication()
         self.contract_thread = ManagedThread()
         self.chunk_dir = os.path.join('data', 'chunks')
         self.client = DownstreamClient(self.server_url,
@@ -742,16 +747,25 @@ class TestClient(unittest.TestCase):
                                        self.chunk_dir)
         self.test_contract = \
             DownstreamContract(self.client,
-                               MockValues.get_chunks_response['chunks'][0]['file_hash'],
-                               MockValues.get_chunks_response['chunks'][0]['seed'],
-                               MockValues.get_chunks_response['chunks'][0]['size'],
+                               MockValues.get_chunks_response[
+                                   'chunks'][0]['file_hash'],
+                               MockValues.get_chunks_response[
+                                   'chunks'][0]['seed'],
+                               MockValues.get_chunks_response[
+                                   'chunks'][0]['size'],
                                Heartbeat.challenge_type().fromdict(
-                                   MockValues.get_chunks_response['chunks'][0]['challenge']),
+                                   MockValues
+                                   .get_chunks_response
+                                   ['chunks'][0]['challenge']),
                                datetime.utcnow() + timedelta(
                                    seconds=int(
-                                       MockValues.get_chunks_response['chunks'][0]['due'])),
+                                       MockValues
+                                       .get_chunks_response
+                                       ['chunks'][0]['due'])),
                                Heartbeat.tag_type().fromdict(
-                                   MockValues.get_chunks_response['chunks'][0]['tag']),
+                                   MockValues
+                                   .get_chunks_response
+                                   ['chunks'][0]['tag']),
                                self.thread_manager,
                                self.chunk_dir)
         self.test_heartbeat = Heartbeat.fromdict(
@@ -962,7 +976,7 @@ class TestClient(unittest.TestCase):
 
     def test_run_contract_manager_shutdown_during_acquisition(self):
         self.setup_run_mocks()
-        
+
         self.client._add_contract.side_effect = \
             AddContractMock(self.client, self.client.thread_manager)
 
@@ -976,14 +990,13 @@ class TestClient(unittest.TestCase):
         self.client._add_contract.side_effect = \
             AddContractMock(self.client)
 
-        self.client.heartbeat_count = mock.MagicMock()
-        self.client.heartbeat_count.return_value = 1
+        self.client.heartbeat_count = 1
 
         self.client.thread_manager.signal_shutdown.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
         self.client.desired_heartbeats = 1
-        
+
         self.client._run_contract_manager()
 
         self.assertTrue(self.client.thread_manager.signal_shutdown.called)
@@ -1042,8 +1055,9 @@ class TestSmartFormatter(unittest.TestCase):
 
     def test_normal(self):
         formatter = shell.SmartFormatter(None)
-        raw_string = 'This is a raw string that will be split over lines because '\
-            'it will go into the HelpFormatter.  but This string needs to be longer'\
+        raw_string = 'This is a raw string that will be split over lines '\
+            'because it will go into the HelpFormatter.  but This string '\
+            'needs to be longer'\
             'than 80 chars to split on the lines'
         value = formatter._split_lines(raw_string, self.width)
         self.assertEqual(
@@ -1177,38 +1191,30 @@ class MockValues:
         "type": "Swizzle"
     }
 
-    get_chunks_response = {
-        "chunks": [
-            {
-            "challenge": "AQAAACAAAACJwjEuYPkbnGOppNVgG0Xc5GKgp0g2kGN2bMCssbMBwIAA"
-                         "AACQkwnIZ7sPJxPRW41MiVTTc40LpgRx8O4hS+T5cuLx0L5KjqnIHOVy"
-                         "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
-                         "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
-                         "uYRpaw==",
-            "due": "60",
-            "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
-                         "91ce7732",
-            "seed": "eb1bb0f7cd24720d456193cca8c42edb",
-            "size": 100,
-            "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
-                   "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
-                   "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
-            }
-        ]
-    }
+    get_chunks_response = {"chunks": [{
+        "challenge": "AQAAACAAAACJwjEuYPkbnGOppNVgG0Xc5GKgp0g2kGN2bMCssbMBwIAA"
+        "AACQkwnIZ7sPJxPRW41MiVTTc40LpgRx8O4hS+T5cuLx0L5KjqnIHOVy"
+        "l4FlWiRgrNRfqCOvMy/SK/fqtAZAOVmnQ6ubs9AqLbGPD2nfFHpgi7yx"
+        "jZZ5Gr7G59HV5O/9EC+SmBmq3bvZuc1rUBGoHb5fOrUm5LHnNQeWPStU"
+        "uYRpaw==",
+        "due": "60",
+        "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
+        "91ce7732",
+        "seed": "eb1bb0f7cd24720d456193cca8c42edb",
+        "size": 100,
+        "tag": "AQAAAIAAAABqXU8BK1mOXFG0mK+X1lWNZ39AmYe1M4JsbIz36wC0PvvcWY+URw"
+        "+BYBlFk5N1+X5VI4F+3sDYYy0jE7mgVCh7kNnOZ/mAYtffFh7izOOS4HHuzWIm"
+        "cOgaVeBL0/ngSPLPYUhFF5uTzKoYUr+SheQDYcuOCg8qivXZGOL6Hv1WVQ=="
+    }]}
 
-    get_challenges_response = {
-        "challenges": [
-            {
-                "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
-                             "91ce7732",
-                "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
-                             "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
-                             "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
-                             "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
-                             "FU58Vw==",
-                "due": "60",
-                "answered": True
-            }
-        ]
-    }
+    get_challenges_response = {"challenges": [{
+        "file_hash": "89ca8e5f02e64694bf889d49a9b7986f201900e6637e0e7349282a85"
+                     "91ce7732",
+        "challenge": "AQAAACAAAAAs/0pRrQ00cWS86II/eAufStyqrjf0wSJ941EjtrLo94AA"
+                     "AABSnAK49Tm7F/4HkQuvdJj1WdisL9OEuMMl9uYMxIp8aXvDqkI/NP4r"
+                     "ix6rREa1Jh6pvH6Mb4DpVHEjDMzVIOKEKV8USKndUq2aNiYf2NqQ1Iw0"
+                     "XkNFsoSgZD10miN8YtatUNu+8gUkT6cv54DUrruo9JTIpXsIqu0BNifu"
+                     "FU58Vw==",
+        "due": "60",
+        "answered": True
+    }]}

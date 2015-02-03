@@ -14,6 +14,7 @@ from .farmer import Farmer
 
 logger = logging.getLogger('storj.downstream_farmer')
 
+
 class SmartFormatter(argparse.HelpFormatter):
 
     """From http://stackoverflow.com/questions/3853722/python-argparse-how-to-insert-newline-in-the-help-text  # NOQA
@@ -27,7 +28,7 @@ class SmartFormatter(argparse.HelpFormatter):
 
 
 def fail_exit(msg, exit_code=1):
-    sys.stderr.write('%s\n' % msg)
+    logger.info(msg)
     sys.exit(exit_code)
 
 
@@ -109,6 +110,8 @@ def parse_args(args=None):
     parser.add_argument('--log-path', help='Path to the log file.  Default is:'
                         ' {0}'.format(log_path),
                         default=log_path)
+    parser.add_argument('--quiet', help='Do not show the status console.',
+                        action='store_true')
     return parser.parse_args(args)
 
 

@@ -3,10 +3,12 @@ import os
 import six
 import sys
 import logging
+import datetime
 from .utils import resource_path, restore, save, ShellApplication
 from .client import DownstreamClient
 from .exc import DownstreamError
-from .cli_stats import FarmerCLIStats, CLIStatusHandler
+from .cli_stats import CLIStatusHandler
+from .farmer_stats import FarmerCLIStats
 
 
 class Farmer(ShellApplication):
@@ -32,17 +34,17 @@ class Farmer(ShellApplication):
         :param args: the arguments from the command line
         """
         ShellApplication.__init__(self)
-        
+
         self.set_up_logging(args)
-        
-        cli_stats = FarmerCLIStats()
-        cli_stats.init()
-        self.set_clistats(cli_stats)
-        
-        status_handler = CLIStatusHandler(cli_stats, 'status')
-        status_handler.setLevel(logging.INFO)
-        self.logger.addHandler(status_handler)
-        
+
+        if (not args.quiet):
+            stats = FarmerCLIStats()
+            stats.init()
+            self.stats = stats
+            status_handler = CLIStatusHandler(stats, 'status')
+            status_handler.setLevel(logging.INFO)
+            self.logger.addHandler(status_handler)
+
         self.cert_path = resource_path('ca-bundle.crt')
         self.verify_cert = not args.ssl_no_verify
 
@@ -76,14 +78,14 @@ class Farmer(ShellApplication):
 
         if (self.address is not None):
             self.logger.info('Farming on address {0}'.format(self.address))
-            
-        self.stats.set('sjcx_address',self.address)
 
-    def set_up_logging(self, args):        
+        self.stats.set('sjcx_address', self.address)
+
+    def set_up_logging(self, args):
         path = os.path.abspath(args.log_path)
         logging.basicConfig(filename=path, level=logging.DEBUG)
         self.logger = logging.getLogger('storj.downstream_farmer')
-            
+
     def prepare_chunk_dir(self):
         try:
             if (not os.path.isdir(self.chunk_dir)):
@@ -147,7 +149,7 @@ class Farmer(ShellApplication):
         if (args.forcenew):
             if (self.token is not None):
                 self.logger.info('Not using token {0} since '
-                            'forcenew was specified.'.format(self.token))
+                                 'forcenew was specified.'.format(self.token))
                 self.token = None
 
     def load_address(self, args):
@@ -215,6 +217,12 @@ class Farmer(ShellApplication):
         except six.moves.urllib.error.URLError:
             raise DownstreamError("Could not connect to server.")
 
+    def called_every_second(self):
+        uptime = self.client.uptime()
+        self.stats.set(
+            'uptime',
+            datetime.timedelta(days=uptime.days, seconds=uptime.seconds))
+
     def run(self, reconnect=False):
         self.logger.info('Farmer started')
         self.client = DownstreamClient(
@@ -232,7 +240,7 @@ class Farmer(ShellApplication):
                 # token didn't exist on the server... clear token
                 # and try again
                 self.logger.warn('Given token did not exist on remote server. '
-                            'Attempting to obtain a new token.')
+                                 'Attempting to obtain a new token.')
                 self.client.token = None
                 self.client.connect()
             else:
