@@ -43,7 +43,8 @@ class DownstreamContract(object):
         start = time.clock()
         RandomIO(self.seed).genfile(self.size, self.path)
         stop = time.clock()
-        self.chunk_generation_rate = float(self.size) / float(stop - start)
+        if (stop - start > 0):
+            self.chunk_generation_rate = float(self.size) / float(stop - start)
         self.data_initialized = True
 
     def cleanup_data(self):
