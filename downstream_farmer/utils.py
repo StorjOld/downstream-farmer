@@ -13,7 +13,7 @@ import time
 import logging
 
 from collections import deque
-from queue import Queue
+from six import Queue
 from datetime import datetime
 
 from .exc import DownstreamError
