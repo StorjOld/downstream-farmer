@@ -260,7 +260,9 @@ class DownstreamClient(object):
             if (len(self.contracts) > 0):
                 total = sum(
                     [c.chunk_generation_rate for c in self.contracts.values()])
-            
+            else:
+                total = 0
+
             if (total > 0):
                 return float(total) / float(len(self.contracts))
             else:
