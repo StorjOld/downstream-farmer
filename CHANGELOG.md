@@ -2,6 +2,9 @@
 
 ### Master
 
+* [ENHANCEMENT] Multiple contracts handled per request.
+* [ENHANCEMENT] Added stats console and moved output to logger
+
 ### v0.1.5
 
 * [ENHANCEMENT] Restructured farmer to include multithreading: multiple contract pools for answering contracts, and a contract management thread for maintaining the desired total contract size
