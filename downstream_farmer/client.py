@@ -708,7 +708,10 @@ class DownstreamClient(object):
             if (len(next) > 0):
                 seconds_to_sleep = (
                     min(next) - datetime.utcnow()).total_seconds()
+                self.logger.debug('Heartbeat manager sleeping {0} seconds'
+                                  .format(seconds_to_sleep))
             else:
+                self.logger.debug('Heartbeat manager sleeping indefinitely.')
                 seconds_to_sleep = None
 
             self.thread_manager.sleep(seconds_to_sleep)

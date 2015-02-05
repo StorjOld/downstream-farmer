@@ -579,26 +579,26 @@ class RateLimit(object):
     """
 
     def __init__(self, rate=None):
-        self.last = 0
-        self.rate = rate
+        self.rate = timedelta(seconds=rate)
+        self.last = datetime.utcnow() - self.rate
 
     def ping(self):
-        if (self.rate is None or (time.clock() - self.last) > self.rate):
-            self.last = time.clock()
+        if (self.rate is None or (datetime.utcnow() - self.last) > self.rate):
+            self.last = datetime.utcnow()
             return True
         else:
             return False
 
     def peek(self):
-        return self.rate is None or (time.clock() - self.last) > self.rate
+        return self.rate is None or (datetime.utcnow() - self.last) > self.rate
 
     def next(self):
         """Returns the number of seconds until the next event can occur
         """
         if (self.peek()):
-            return 0
+            return datetime.utcnow()
         else:
-            return self.last + self.rate - time.clock()
+            return self.last + self.rate
 
 
 class BurstQueue(object):
@@ -647,9 +647,7 @@ class BurstQueue(object):
                 if (earliest is None or queue_item.due < earliest):
                     earliest = queue_item.due
         if (earliest is not None):
-            next_possible = datetime.utcnow() + \
-                timedelta(seconds=self.rate_limit.next())
-            return max(earliest, next_possible)
+            return max(earliest, self.rate_limit.next())
         else:
             return None
 
