@@ -242,7 +242,7 @@ class WorkItem(object):
 
     def __call__(self):
         self.target(*self.args, **self.kwargs)
-        
+
     def __lt__(self, other):
         return self.priority < other.priority
 
@@ -573,32 +573,34 @@ class BurstQueueItem(object):
 
 
 class RateLimit(object):
+
     """Simple rate limiter with no bursting
     :param rate: in seconds per request
     """
+
     def __init__(self, rate=None):
         self.last = 0
         self.rate = rate
-        
+
     def ping(self):
         if (self.rate is None or (time.clock() - self.last) > self.rate):
             self.last = time.clock()
             return True
         else:
             return False
-    
+
     def peek(self):
         return self.rate is None or (time.clock() - self.last) > self.rate
-        
+
     def next(self):
         """Returns the number of seconds until the next event can occur
         """
         if (self.peek()):
             return 0
         else:
-            return self.last+self.rate-time.clock()
-        
-        
+            return self.last + self.rate - time.clock()
+
+
 class BurstQueue(object):
 
     """
@@ -638,14 +640,15 @@ class BurstQueue(object):
 
     def next_due(self):
         """Gets the next due time
-        """        
+        """
         earliest = None
         with self.queue_lock:
             for queue_item in self.queue:
                 if (earliest is None or queue_item.due < earliest):
                     earliest = queue_item.due
         if (earliest is not None):
-            next_possible = datetime.utcnow() + timedelta(seconds=self.rate_limit.next())
+            next_possible = datetime.utcnow() + \
+                timedelta(seconds=self.rate_limit.next())
             return max(earliest, next_possible)
         else:
             return None

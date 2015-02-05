@@ -13,7 +13,6 @@ import logging
 import requests
 import heartbeat
 from datetime import datetime, timedelta
-from operator import attrgetter
 
 from .utils import handle_json_response, ThreadPool, sizeof_fmt, \
     BurstQueue, Counter
@@ -90,7 +89,7 @@ class DownstreamClient(object):
         self.proving_counter = Counter()
         self.submitting_counter = Counter()
         self.updating_counter = Counter()
-        
+
         self.logger = logging.getLogger(
             'storj.downstream_farmer.DownstreamClient')
         self.start = None
@@ -385,8 +384,7 @@ class DownstreamClient(object):
     def _prove_async(self, contract):
         # print('Scheduling proof for contract {0}.'.format(contract))
         self.worker_pool.put_work(self._prove, (contract, ), priority=50)
-                                        
-        
+
     def _prove(self, contract):
         """Calculates a proof for the specified contract and puts it into the
         proof queue
@@ -408,8 +406,10 @@ class DownstreamClient(object):
             self.logger.warn('Proof for contract {0} was not available.'
                              .format(contract))
             # we need to take some action here... try again
-            # it should only get here if it tried to prove before it was updated
-            # which shouldnt happen...
+            # it should only get here if it tried to prove before it was
+            # updated which shouldnt happen...  but in case it does,
+            # the contract should still be valid, just put it back
+            # in the proof queue
             # after 3 seconds
             time.sleep(3)
             self._prove_async(contract)
@@ -539,8 +539,8 @@ class DownstreamClient(object):
             if (earliest is not None):
                 self.logger.debug('Earliest submitted contract ready in '
                                   '{0} seconds'
-                                  .format((earliest-datetime.utcnow())
-                                  .total_seconds()))
+                                  .format((earliest - datetime.utcnow())
+                                          .total_seconds()))
 
         # and wake heartbeat manager again
         self.heartbeat_thread.wake()
@@ -618,7 +618,7 @@ class DownstreamClient(object):
                     contract.answered = challenge['answered']
 
                     updated.add(contract)
-                    
+
                     # go ahead and begin proving now to save time
                     self._prove_async(contract)
 
@@ -658,8 +658,8 @@ class DownstreamClient(object):
             if (earliest is not None):
                 self.logger.debug('Earliest updated contract due in {0} '
                                   'seconds'
-                                  .format((earliest-datetime.utcnow())
-                                  .total_seconds()))
+                                  .format((earliest - datetime.utcnow())
+                                          .total_seconds()))
 
         # dont need to wake heartbeat manager because we didn't put anything
         # into a queue
