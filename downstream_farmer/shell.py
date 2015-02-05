@@ -110,6 +110,8 @@ def parse_args(args=None):
                         default=log_path)
     parser.add_argument('--quiet', help='Do not show the status console.',
                         action='store_true')
+    parser.add_argument('--print-log', help='Print log to screen instead of '
+                        'status console.', action='store_true')
     return parser.parse_args(args)
 
 

@@ -37,13 +37,17 @@ class Farmer(ShellApplication):
 
         self.set_up_logging(args)
 
-        if (not args.quiet):
+        if (not args.quiet and not args.print_log):
             stats = FarmerCLIStats()
             stats.init()
             self.stats = stats
             status_handler = CLIStatusHandler(stats, 'status')
             status_handler.setLevel(logging.INFO)
             self.logger.addHandler(status_handler)
+        elif (args.print_log):
+            console_handler = logging.StreamHandler(stream=sys.stdout)
+            console_handler.setLevel(logging.DEBUG)
+            self.logger.addHandler(console_handler)
 
         self.cert_path = resource_path('ca-bundle.crt')
         self.verify_cert = not args.ssl_no_verify
