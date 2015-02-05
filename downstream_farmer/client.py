@@ -65,7 +65,7 @@ class DownstreamClient(object):
         self.desired_heartbeats = None
         # contracts will begin to be answered
         # at least this number of seconds before they expire
-        self.response_margin = 40
+        self.response_margin = 50
         # contracts will begin to be updated
         # no later than this amount of time after it is possible to update them
         # the margin between then a contract is updated and when it must be
