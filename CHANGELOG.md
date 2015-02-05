@@ -2,6 +2,9 @@
 
 ### Master
 
+### v0.1.6
+
+* [ENHANCEMENT] Added --print-log option to print logging to console.
 * [ENHANCEMENT] Multiple contracts handled per request.
 * [ENHANCEMENT] Added stats console and moved output to logger
 
