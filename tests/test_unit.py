@@ -745,6 +745,7 @@ class TestClient(unittest.TestCase):
                                        self.sig,
                                        self.thread_manager,
                                        self.chunk_dir)
+        self.client.session = mock.MagicMock()
         self.test_contract = \
             DownstreamContract(self.client,
                                MockValues.get_chunks_response[
@@ -790,8 +791,7 @@ class TestClient(unittest.TestCase):
             str(ex.exception), 'If no token is specified, address must be.')
 
     def test_connect_failed(self):
-        with mock.patch('downstream_farmer.client.requests.get'),\
-                mock.patch('downstream_farmer.client.handle_json_response')\
+        with mock.patch('downstream_farmer.client.handle_json_response')\
                 as hp:
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
@@ -800,30 +800,28 @@ class TestClient(unittest.TestCase):
                 str(ex.exception), 'Unable to connect: test error')
 
     def test_connect_malformed(self):
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            inst = patch.return_value
-            inst.json.return_value = {"invalid": "dict"}
-            with self.assertRaises(DownstreamError) as ex:
-                self.client.connect()
-            self.assertEqual(
-                str(ex.exception), 'Malformed response from server.')
+        inst = self.client.session.get.return_value
+        inst.json.return_value = {"invalid": "dict"}
+        with self.assertRaises(DownstreamError) as ex:
+            self.client.connect()
+        self.assertEqual(
+            str(ex.exception), 'Malformed response from server.')
 
     def test_connect_invalid_heartbeat(self):
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            inst = patch.return_value
-            inst.json.return_value = {"heartbeat": "test heartbeat",
-                                      "token": "test token",
-                                      "type": "invalid type"}
-            with self.assertRaises(DownstreamError) as ex:
-                self.client.connect()
-            self.assertEqual(str(ex.exception), 'Unknown Heartbeat Type')
+        inst = self.client.session.get.return_value
+        inst.json.return_value = {"heartbeat": "test heartbeat",
+                                  "token": "test token",
+                                  "type": "invalid type"}
+        with self.assertRaises(DownstreamError) as ex:
+            self.client.connect()
+        self.assertEqual(str(ex.exception), 'Unknown Heartbeat Type')
 
     def test_connect_working_new(self):
         self.client.token = None
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            patch.return_value.json.return_value = MockValues.connect_response
-            self.client.connect()
-        patch.assert_called_with(
+        self.client.session.get.return_value.json.return_value \
+            = MockValues.connect_response
+        self.client.connect()
+        self.client.session.get.assert_called_with(
             '{0}/new/{1}'.format(self.server_url.strip('/') + self.api_path,
                                  self.address), verify=None)
         self.assertEqual(
@@ -833,10 +831,10 @@ class TestClient(unittest.TestCase):
                          .fromdict(MockValues.connect_response['heartbeat']))
 
     def test_connect_working(self):
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            patch.return_value.json.return_value = MockValues.connect_response
-            self.client.connect()
-        patch.assert_called_with('{0}/heartbeat/{1}'.format(
+        self.client.session.get.return_value.json.return_value \
+            = MockValues.connect_response
+        self.client.connect()
+        self.client.session.get.assert_called_with('{0}/heartbeat/{1}'.format(
             self.server_url.strip('/') + self.api_path, self.token),
             verify=None)
         self.assertEqual(
@@ -851,21 +849,22 @@ class TestClient(unittest.TestCase):
         '72/ciXiEPfjli3ENfwWuESHhv6K9esI0dl5I='
         self.client.address = '19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'
         self.client.token = None
-        with mock.patch('downstream_farmer.client.requests.post') as patch:
-            patch.return_value.json.return_value = MockValues.connect_response
-            self.client.connect()
-        patch.assert_called_with('{0}/new/{1}'.format(self.server_url
-                                                      .strip('/') + self
-                                                      .api_path, self
-                                                      .client.address),
-                                 data=json.dumps({
-                                     "message": self.client.msg,
-                                     "signature": self.client.sig
-                                 }),
-                                 headers={
-            'Content-Type': 'application/json'
-        },
-            verify=None)
+        self.client.session.post.return_value.json.return_value \
+            = MockValues.connect_response
+        self.client.connect()
+        self.client.session.post.\
+            assert_called_with(
+                '{0}/new/{1}'
+                .format(self.server_url.strip('/') + self.api_path,
+                        self.client.address),
+                data=json.dumps({
+                    "message": self.client.msg,
+                    "signature": self.client.sig
+                }),
+                headers={
+                    'Content-Type': 'application/json'
+                },
+                verify=None)
         self.assertEqual(
             self.client.token, MockValues.connect_response['token'])
         self.assertEqual(self.client.heartbeat,
@@ -873,8 +872,7 @@ class TestClient(unittest.TestCase):
                                             .connect_response['heartbeat']))
 
     def test_get_contract_no_token(self):
-        with mock.patch('downstream_farmer.client.requests.get'),\
-                mock.patch('downstream_farmer.client.handle_json_response')\
+        with mock.patch('downstream_farmer.client.handle_json_response')\
                 as hp:
             hp.side_effect = DownstreamError('test error')
             with self.assertRaises(DownstreamError) as ex:
@@ -883,19 +881,19 @@ class TestClient(unittest.TestCase):
                 str(ex.exception), 'Unable to get contracts: test error')
 
     def test_get_contract_malformed(self):
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            patch.return_value.json.return_value = {"invalid": "dict"}
-            with self.assertRaises(DownstreamError) as ex:
-                self.client._get_contracts()
-            self.assertEqual(
-                str(ex.exception), 'Malformed response from server.')
+        patch = self.client.session.get
+        patch.return_value.json.return_value = {"invalid": "dict"}
+        with self.assertRaises(DownstreamError) as ex:
+            self.client._get_contracts()
+        self.assertEqual(
+            str(ex.exception), 'Malformed response from server.')
 
     def test_get_contracts_working(self):
         self.client.heartbeat = self.test_heartbeat
-        with mock.patch('downstream_farmer.client.requests.get') as patch:
-            inst = patch.return_value
-            inst.json.return_value = MockValues.get_chunks_response.copy()
-            contracts = self.client._get_contracts(100)
+        patch = self.client.session.get
+        inst = patch.return_value
+        inst.json.return_value = MockValues.get_chunks_response.copy()
+        contracts = self.client._get_contracts(100)
         self.assertEqual(
             contracts[0].hash, self.test_contract.hash)
         self.assertEqual(
@@ -911,10 +909,8 @@ class TestClient(unittest.TestCase):
 
     def test_get_contract_no_chunks_available(self):
         self.client.heartbeat = self.test_heartbeat
-        with mock.patch('downstream_farmer.client.requests.get'),\
-                mock.patch(
-                'downstream_farmer.client.handle_json_response'
-        ) as hpatch:
+        with mock.patch(
+                'downstream_farmer.client.handle_json_response') as hpatch:
             hpatch.return_value = dict(chunks=[])
             contracts = self.client._get_contracts()
             self.assertEqual(len(contracts), 0)

@@ -39,7 +39,7 @@ after_success:
 script:
   - coverage run setup.py test -a "--doctest-modules --pep8 -v tests/ downstream_farmer/"
   - coverage report -m --include="downstream_farmer/*"
-  - "downstream  --quiet -n 1 --size 32768 'http://localhost:5000'"
+  - "downstream --quiet -n 1 --size 32768 http://localhost:5000"
   - cat node/nohup.out
   - cat farmer.log
 

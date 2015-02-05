@@ -98,6 +98,8 @@ class DownstreamClient(object):
         # update to resubmit
         self.retry_interval = 3
 
+        self.session = requests.Session()
+
     def set_cert_path(self, cert_path):
         """Sets the path of a CA-Bundle to use for verifying requests
         """
@@ -137,20 +139,20 @@ class DownstreamClient(object):
                 headers = {
                     'Content-Type': 'application/json'
                 }
-                resp = requests.post(
+                resp = self.session.post(
                     url,
                     data=json.dumps(data),
                     headers=headers,
                     verify=self.requests_verify_arg)
             else:
                 # otherwise, just normal request
-                resp = requests.get(url, verify=self.requests_verify_arg)
+                resp = self.session.get(url, verify=self.requests_verify_arg)
         else:
             # try to use our token
             url = '{0}/heartbeat/{1}'.\
                 format(self.api_url, self.token)
 
-            resp = requests.get(url, verify=self.requests_verify_arg)
+            resp = self.session.get(url, verify=self.requests_verify_arg)
 
         try:
             r_json = handle_json_response(resp)
@@ -187,7 +189,7 @@ class DownstreamClient(object):
             url += '/{0}'.format(size)
 
         try:
-            resp = requests.get(url, verify=self.requests_verify_arg)
+            resp = self.session.get(url, verify=self.requests_verify_arg)
 
             r_json = handle_json_response(resp)
         except:
@@ -324,7 +326,6 @@ class DownstreamClient(object):
         """This loop will maintain the desired total contract size, if
         possible
         """
-        online_already = False
 
         while (self.thread_manager.running):
             size_to_fill = self._size_to_fill()
@@ -365,15 +366,12 @@ class DownstreamClient(object):
             if (not self.thread_manager.running):
                 # we already exited.  contract_manager needs to return now
                 break
-            # wait until we need to obtain a new contract
-            if (not online_already):
-                online_already = True
+
             self.contract_thread.wait(30)
 
             if (self.desired_heartbeats is not None
                     and self.heartbeat_count >= self.desired_heartbeats):
                 # signal a shutdown, and return
-                print('Heartbeat number requirement met.')
                 self.logger.info('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
                 break
@@ -445,10 +443,10 @@ class DownstreamClient(object):
                     self.logger.debug('{0} proofs being submitted ({1})'
                                       .format(len(proofs),
                                               sizeof_fmt(len(json_data))))
-                    resp = requests.post(url,
-                                         data=json_data,
-                                         headers=headers,
-                                         verify=self.requests_verify_arg)
+                    resp = self.session.post(url,
+                                             data=json_data,
+                                             headers=headers,
+                                             verify=self.requests_verify_arg)
                 except:
                     raise DownstreamError('Unable to perform HTTP post.')
 
@@ -565,10 +563,10 @@ class DownstreamClient(object):
                     'Content-Type': 'application/json'
                 }
                 try:
-                    resp = requests.post(url,
-                                         data=json.dumps(data),
-                                         headers=headers,
-                                         verify=self.requests_verify_arg)
+                    resp = self.session.post(url,
+                                             data=json.dumps(data),
+                                             headers=headers,
+                                             verify=self.requests_verify_arg)
                 except:
                     raise DownstreamError('Unable to perform HTTP post.')
 
