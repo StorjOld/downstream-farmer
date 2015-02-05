@@ -13,6 +13,7 @@ import logging
 import requests
 import heartbeat
 from datetime import datetime, timedelta
+from operator import attrgetter
 
 from .utils import handle_json_response, ThreadPool, sizeof_fmt, \
     BurstQueue, Counter
@@ -45,8 +46,11 @@ class DownstreamClient(object):
         self.sig = sig
         self.heartbeat = None
 
+        # for managing how many contracts
         self.contract_thread = None
+        # for managing heartbeats
         self.heartbeat_thread = None
+        # for submitting/updating/proving contracts
         self.worker_pool = None
         self.cert_path = None
         self.verify_cert = True
@@ -60,15 +64,15 @@ class DownstreamClient(object):
         self.heartbeat_count_lock = threading.Lock()
         self.heartbeat_count = 0
         self.desired_heartbeats = None
-        # response margin defaults to 20.  contracts will begin to be answered
+        # contracts will begin to be answered
         # at least this number of seconds before they expire
-        self.response_margin = 20
-        # update margin defaults to 20.  contracts will begin to be updated
+        self.response_margin = 40
+        # contracts will begin to be updated
         # no later than this amount of time after it is possible to update them
         # the margin between then a contract is updated and when it must be
         # proven will be dependent on the interval.  if the interval is less
         # than the update_margin, the contract will fail.
-        self.update_margin = 20
+        self.update_margin = 10
         # status of the contract, used for determining whether to update or
         # what
         self.contract_status = dict()
@@ -80,13 +84,13 @@ class DownstreamClient(object):
         self.estimated_onboard_speed = 2000000
         self.estimated_contract_interval = 60
 
-        self.submission_queue = BurstQueue()
-        self.update_queue = BurstQueue()
+        self.submission_queue = BurstQueue(rate=5)
+        self.update_queue = BurstQueue(rate=5)
 
         self.proving_counter = Counter()
         self.submitting_counter = Counter()
         self.updating_counter = Counter()
-
+        
         self.logger = logging.getLogger(
             'storj.downstream_farmer.DownstreamClient')
         self.start = None
@@ -239,6 +243,7 @@ class DownstreamClient(object):
         with self.contracts_lock:
             contract.generate_data()
             self.contracts[contract.hash] = contract
+            self._update_contract_stats()
 
     def _remove_all_contracts(self):
         to_remove = list()
@@ -253,6 +258,7 @@ class DownstreamClient(object):
             if (contract.hash in self.contracts):
                 contract.cleanup_data()
                 del self.contracts[contract.hash]
+                self._update_contract_stats()
 
     def _remove_contract_by_hash(self, contract_hash):
         with self.contracts_lock:
@@ -346,7 +352,6 @@ class DownstreamClient(object):
                 if (len(contracts) > 0):
                     for contract in contracts:
                         self._add_contract(contract)
-                        self._update_contract_stats()
                         # and begin proving this contract
                         self._prove_async(contract)
                         if (not self.thread_manager.running):
@@ -379,8 +384,9 @@ class DownstreamClient(object):
 
     def _prove_async(self, contract):
         # print('Scheduling proof for contract {0}.'.format(contract))
-        self.worker_pool.put_work(self._prove, (contract, ))
-
+        self.worker_pool.put_work(self._prove, (contract, ), priority=50)
+                                        
+        
     def _prove(self, contract):
         """Calculates a proof for the specified contract and puts it into the
         proof queue
@@ -401,11 +407,17 @@ class DownstreamClient(object):
         else:
             self.logger.warn('Proof for contract {0} was not available.'
                              .format(contract))
+            # we need to take some action here... try again
+            # it should only get here if it tried to prove before it was updated
+            # which shouldnt happen...
+            # after 3 seconds
+            time.sleep(3)
+            self._prove_async(contract)
 
         self.heartbeat_thread.wake()
 
     def _submit_async(self, contracts):
-        self.worker_pool.put_work(self._submit, (contracts, ))
+        self.worker_pool.put_work(self._submit, (contracts, ), priority=10)
 
     def _submit(self, contracts):
         """Submits the specified contracts
@@ -424,12 +436,17 @@ class DownstreamClient(object):
                     'proofs': proofs
                 }
                 headers = {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Content-Encoding': 'gzip'
                 }
+                json_data = json.dumps(data)
 
                 try:
+                    self.logger.debug('{0} proofs being submitted ({1})'
+                                      .format(len(proofs),
+                                              sizeof_fmt(len(json_data))))
                     resp = requests.post(url,
-                                         data=json.dumps(data),
+                                         data=json_data,
                                          headers=headers,
                                          verify=self.requests_verify_arg)
                 except:
@@ -460,7 +477,7 @@ class DownstreamClient(object):
 
                     if ('error' in contract_report):
                         self.logger.error('Error answering challenge for'
-                                          ' contract {0}: {1}, '
+                                          ' contract {0}: {1}'
                                           .format(contract,
                                                   contract_report['error']))
                         continue
@@ -502,6 +519,7 @@ class DownstreamClient(object):
         else:
             # no issues submitting bulk of the contracts
             # place submitted proofs in update queue
+            earliest = None
             for c in contracts:
                 if (c not in submitted):
                     self.logger.error('Contract {0} not successfully '
@@ -513,15 +531,22 @@ class DownstreamClient(object):
                     update_time = (c.expiration
                                    + timedelta(seconds=self.update_margin))
                     self.update_queue.put(c, update_time, ready_time)
+                    if (earliest is None or c.expiration < earliest):
+                        earliest = c.expiration
 
             self.logger.info('Submitted {0} proofs successfully in {1} seconds'
                              .format(len(submitted), round(stop - start, 3)))
+            if (earliest is not None):
+                self.logger.debug('Earliest submitted contract ready in '
+                                  '{0} seconds'
+                                  .format((earliest-datetime.utcnow())
+                                  .total_seconds()))
 
         # and wake heartbeat manager again
         self.heartbeat_thread.wake()
 
     def _update_async(self, contracts):
-        self.worker_pool.put_work(self._update, (contracts, ))
+        self.worker_pool.put_work(self._update, (contracts, ), priority=20)
 
     def _update(self, contracts):
         try:
@@ -593,6 +618,9 @@ class DownstreamClient(object):
                     contract.answered = challenge['answered']
 
                     updated.add(contract)
+                    
+                    # go ahead and begin proving now to save time
+                    self._prove_async(contract)
 
                 stop = time.clock()
         except:
@@ -614,16 +642,24 @@ class DownstreamClient(object):
                     self._remove_contract(c)
             self.heartbeat_thread.wake()
         else:
+            earliest = None
             for c in contracts:
                 if (c not in updated):
                     self.logger.error('Contract {0} not updated, dropping'
                                       .format(c))
                     self._remove_contract(c)
                 else:
-                    self._prove_async(c)
+                    if (earliest is None or c.expiration < earliest):
+                        earliest = c.expiration
+                    # prove should already have begun
 
             self.logger.info('Updated {0} contracts in {1} seconds'
                              .format(len(updated), round(stop - start, 3)))
+            if (earliest is not None):
+                self.logger.debug('Earliest updated contract due in {0} '
+                                  'seconds'
+                                  .format((earliest-datetime.utcnow())
+                                  .total_seconds()))
 
         # dont need to wake heartbeat manager because we didn't put anything
         # into a queue

@@ -12,8 +12,8 @@ import time
 import logging
 
 from collections import deque
-from six.moves.queue import Queue
-from datetime import datetime
+from six.moves.queue import PriorityQueue
+from datetime import datetime, timedelta
 
 from .exc import DownstreamError
 from .cli_stats import Stats
@@ -234,13 +234,17 @@ class ThreadManager(object):
 
 class WorkItem(object):
 
-    def __init__(self, target=None, args=[], kwargs={}):
+    def __init__(self, target=None, args=[], kwargs={}, priority=50):
         self.target = target
         self.args = args
         self.kwargs = kwargs
+        self.priority = priority
 
     def __call__(self):
         self.target(*self.args, **self.kwargs)
+        
+    def __lt__(self, other):
+        return self.priority < other.priority
 
 
 class WorkerThread(threading.Thread):
@@ -300,18 +304,19 @@ class ThreadPool(object):
         """
         self.logger = logging.getLogger(
             'storj.downstream_farmer.utils.ThreadPool')
-        self.tasks = Queue()
+        self.tasks = PriorityQueue()
         self.thread_manager = thread_manager
         self.workers = list()
         self.workers_lock = threading.Lock()
-        for i in range(0, thread_count):
-            self._add_thread()
+        self.max_thread_count = 50
+        self.load_minimum = 0.01
+        self.load_maximum = 0.5
         # managed monitor thread
         self.monitor_thread = self.thread_manager.create_thread(
             name='MonitorThread',
             target=self._monitor)
-        self.load_minimum = 0.01
-        self.load_maximum = 0.25
+        for i in range(0, thread_count):
+            self._add_thread()
 
     def thread_count(self):
         with self.workers_lock:
@@ -319,12 +324,15 @@ class ThreadPool(object):
 
     def _add_thread(self):
         # unmanaged worker threads
-        self.logger.debug(
-            '{0} : adding worker'.format(threading.current_thread()))
-        worker = WorkerThread(self)
-        with self.workers_lock:
-            self.workers.append(worker)
-        return worker
+        if (len(self.workers) < self.max_thread_count):
+            self.logger.debug(
+                '{0} : adding worker'.format(threading.current_thread()))
+            worker = WorkerThread(self)
+            with self.workers_lock:
+                self.workers.append(worker)
+            return worker
+        else:
+            return None
 
     def _remove_thread(self):
         with self.workers_lock:
@@ -372,7 +380,8 @@ class ThreadPool(object):
             load = self.calculate_loading()
             if (load > self.load_maximum):
                 worker = self._add_thread()
-                worker.start()
+                if (worker is not None):
+                    worker.start()
             elif (load < self.load_minimum):
                 self._remove_thread()
             self.thread_manager.sleep(10)
@@ -382,11 +391,11 @@ class ThreadPool(object):
         self.logger.debug('MonitorThread finishing')
         # now, managed thread can exit so program can close cleanly
 
-    def put_work(self, target, args=[], kwargs={}):
+    def put_work(self, target, args=[], kwargs={}, priority=50):
         """Puts work in the work queue.
         :param work: callable work object
         """
-        self.tasks.put(WorkItem(target, args, kwargs))
+        self.tasks.put(WorkItem(target, args, kwargs, priority))
 
     def start(self):
         """Starts the thread pool and all its workers and the monitor thread
@@ -420,13 +429,16 @@ class ShellApplication(ThreadManager):
 
 class Counter(object):
 
-    def __init__(self):
+    def __init__(self, zero_callback=None):
         self.count = 0
         self.lock = threading.Lock()
+        self.zero_callback = zero_callback
 
     def add(self, number):
         with self.lock:
             self.count += number
+            if (self.zero_callback is not None and self.count == 0):
+                self.zero_callback()
 
     def __call__(self, number=1):
         return CounterContext(self, number)
@@ -560,6 +572,33 @@ class BurstQueueItem(object):
         return self.earliest < datetime.utcnow()
 
 
+class RateLimit(object):
+    """Simple rate limiter with no bursting
+    :param rate: in seconds per request
+    """
+    def __init__(self, rate=None):
+        self.last = 0
+        self.rate = rate
+        
+    def ping(self):
+        if (self.rate is None or (time.clock() - self.last) > self.rate):
+            self.last = time.clock()
+            return True
+        else:
+            return False
+    
+    def peek(self):
+        return self.rate is None or (time.clock() - self.last) > self.rate
+        
+    def next(self):
+        """Returns the number of seconds until the next event can occur
+        """
+        if (self.peek()):
+            return 0
+        else:
+            return self.last+self.rate-time.clock()
+        
+        
 class BurstQueue(object):
 
     """
@@ -571,9 +610,10 @@ class BurstQueue(object):
     all the items in the queue that are ready.
     """
 
-    def __init__(self):
+    def __init__(self, rate=None):
         self.queue = deque()
         self.queue_lock = threading.Lock()
+        self.rate_limit = RateLimit(rate)
 
     def put(self, item, due, earliest=None):
         with self.queue_lock:
@@ -581,7 +621,7 @@ class BurstQueue(object):
 
     def get(self):
         """Gets the list of ready items if any items are due"""
-        if (self._any_due()):
+        if (self._any_due() and self.rate_limit.peek()):
             with self.queue_lock:
                 ready_items = list()
                 unready_items = deque()
@@ -591,19 +631,24 @@ class BurstQueue(object):
                     else:
                         unready_items.append(i)
                 self.queue = unready_items
+                self.rate_limit.ping()
                 return ready_items
         else:
             return list()
 
     def next_due(self):
         """Gets the next due time
-        """
+        """        
         earliest = None
         with self.queue_lock:
             for queue_item in self.queue:
                 if (earliest is None or queue_item.due < earliest):
                     earliest = queue_item.due
-        return earliest
+        if (earliest is not None):
+            next_possible = datetime.utcnow() + timedelta(seconds=self.rate_limit.next())
+            return max(earliest, next_possible)
+        else:
+            return None
 
     def _any_due(self):
         """Returns whether any items are due
