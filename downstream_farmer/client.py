@@ -357,7 +357,9 @@ class DownstreamClient(object):
                         'There were no chunks available on the server.')
                     break
                 stop = time.clock()
-                self.estimated_onboard_speed = obtained_size / (stop - start)
+                elapsed = stop-start
+                if (elapsed > 0):
+                    self.estimated_onboard_speed = obtained_size / elapsed
                 size_to_fill = self._size_to_fill()
 
             if (not self.thread_manager.running):
