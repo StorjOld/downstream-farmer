@@ -77,7 +77,7 @@ class DownstreamClient(object):
         # and or download speeds in actual applications
         self.estimated_onboard_speed = 2000000
         self.estimated_contract_interval = 60
-        
+
         self.submission_queue = BurstQueue(rate=5)
         self.update_queue = BurstQueue(rate=5)
 
@@ -357,7 +357,7 @@ class DownstreamClient(object):
                         'There were no chunks available on the server.')
                     break
                 stop = time.clock()
-                self.estimated_onboard_speed = obtained_size / (stop-start)
+                self.estimated_onboard_speed = obtained_size / (stop - start)
                 size_to_fill = self._size_to_fill()
 
             if (not self.thread_manager.running):
@@ -413,7 +413,6 @@ class DownstreamClient(object):
             # it should be added back in the update queue.  otherwise,
             # this should just remove the contract since its errant
             self._remove_contract(contract)
-
 
     def _submit_async(self, contracts):
         self.worker_pool.put_work(self._submit, (contracts, ), priority=10)
@@ -747,7 +746,7 @@ class DownstreamClient(object):
                                                 self.heartbeat_thread.wake)
         self.update_queue.set_full_callback(500,
                                             self.heartbeat_thread.wake)
-            
+
         # create the thread pool for challenges
         self.worker_pool = ThreadPool(self.thread_manager, 1)
 
