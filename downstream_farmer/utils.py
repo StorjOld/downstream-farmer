@@ -610,16 +610,28 @@ class BurstQueue(object):
     When `get` is called, it either returns an empty list if there are
     no due items, or if there are any due items, it will return
     all the items in the queue that are ready.
+    Optionally it can have a rate limit to the number of time
+    items can be retrieved, and also a full callback that occurs
+    when the number of items exceeds a specified number
     """
 
-    def __init__(self, rate=None):
+    def __init__(self, rate=None, full_size=None, full_callback=None):
         self.queue = deque()
         self.queue_lock = threading.Lock()
         self.rate_limit = RateLimit(rate)
+        self.set_full_callback(full_size, full_callback)
+                         
+    def set_full_callback(self, full_size, full_callback):
+        self.full_size = full_size
+        self.full_callback = full_callback
+        self.callback = (full_size is not None 
+                         and full_callback is not None)
 
     def put(self, item, due, earliest=None):
         with self.queue_lock:
             self.queue.append(BurstQueueItem(item, due, earliest))
+            if (self.callback and len(self.queue) >= self.full_size):
+                self.full_callback()
 
     def get(self):
         """Gets the list of ready items if any items are due"""
@@ -655,7 +667,38 @@ class BurstQueue(object):
         """Returns whether any items are due
         """
         with self.queue_lock:
+            if (self.callback and len(self.queue) > self.full_size):
+                return True
             for queue_item in self.queue:
                 if (queue_item.is_due()):
                     return True
         return False
+
+
+class SimpleIterableJsonEncoder(json.JSONEncoder):
+    def iterencode(self, o, _one_shot=False):
+        try:
+            # try base class method
+            chunks = json.JSONEncoder.iterencode(self, o, _one_shot)
+            for chunk in chunks:
+                yield chunk
+        except TypeError as ex:
+            # type error... see if the item is iterable
+            try:
+                iterable = iter(o)
+            except:
+                raise ex
+            else:
+                # item is iterable
+                yield '['
+                buf = ''
+                first = True
+                for item in iterable:
+                    if (first):
+                        first = False
+                    else:
+                        buf = self.item_separator
+                    chunks = self.iterencode(item)
+                    for chunk in chunks:
+                        yield buf + chunk
+                yield ']'

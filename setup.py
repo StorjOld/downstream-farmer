@@ -49,7 +49,7 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 dependencies = [
-    'https://github.com/Storj/heartbeat/tarball/master#egg=storj-heartbeat-0.1.5.1',
+    'https://github.com/Storj/heartbeat/tarball/master#egg=storj-heartbeat-0.1.9',
     'https://github.com/Storj/RandomIO/tarball/master#egg=RandomIO-0.1.0',
     'https://github.com/Storj/siggy/tarball/master#egg=siggy-0.1.0'
 ]

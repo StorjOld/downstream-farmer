@@ -64,25 +64,20 @@ class DownstreamClient(object):
         self.heartbeat_count = 0
         self.desired_heartbeats = None
         # contracts will begin to be answered
-        # at least this number of seconds before they expire
-        self.response_margin = 50
+        # at least this number of seconds after they are proven
+        self.response_margin = 5
         # contracts will begin to be updated
         # no later than this amount of time after it is possible to update them
         # the margin between then a contract is updated and when it must be
-        # proven will be dependent on the interval.  if the interval is less
-        # than the update_margin, the contract will fail.
-        self.update_margin = 10
-        # status of the contract, used for determining whether to update or
-        # what
-        self.contract_status = dict()
-        self.contract_status_lock = threading.Lock()
+        # proven will be dependent on the interval.
+        self.update_margin = 5
         # this is the initial estimated onboard rate, that determines how fast
         # the farmer can onboard contracts in bytes/second
         # this provides an initial estimate.... it will be dependent on disk
         # and or download speeds in actual applications
         self.estimated_onboard_speed = 2000000
         self.estimated_contract_interval = 60
-
+        
         self.submission_queue = BurstQueue(rate=5)
         self.update_queue = BurstQueue(rate=5)
 
@@ -296,7 +291,7 @@ class DownstreamClient(object):
         total_margin = self.update_margin
         desired_write_time = self._get_average_contract_interval() - \
             total_margin
-        average_gen_rate = self._get_average_chunk_generation_rate()
+        average_gen_rate = self.estimated_onboard_speed
         # half the size just to account for
         # other overhead in producing challenges
         # etc.
@@ -332,6 +327,7 @@ class DownstreamClient(object):
             while (self.thread_manager.running and size_to_fill > 0):
                 self.logger.info('Requesting chunks to fill {0}'
                                  .format(sizeof_fmt(size_to_fill)))
+                start = time.clock()
                 try:
                     contracts = self._get_contracts(size_to_fill)
                 except DownstreamError as ex:
@@ -360,7 +356,8 @@ class DownstreamClient(object):
                     self.logger.info(
                         'There were no chunks available on the server.')
                     break
-
+                stop = time.clock()
+                self.estimated_onboard_speed = obtained_size / (stop-start)
                 size_to_fill = self._size_to_fill()
 
             if (not self.thread_manager.running):
@@ -396,23 +393,27 @@ class DownstreamClient(object):
             return
 
         if (proven):
-            submission_time = (contract.expiration
-                               - timedelta(seconds=self.response_margin))
+            submission_time = datetime.utcnow() \
+                + timedelta(seconds=self.response_margin)
             # print('Putting {0} into submission queue.'.format(contract))
-            self.submission_queue.put(contract, submission_time)
+            if (contract.expiration > submission_time):
+                self.submission_queue.put(contract, submission_time)
+                self.heartbeat_thread.wake()
+            else:
+                self.logger.info('Proof for contract {0} will not be submitted'
+                                 ' before expiration.  Dropping contract.'
+                                 .format(contract))
+                self._remove_contract(contract)
         else:
             self.logger.warn('Proof for contract {0} was not available.'
                              .format(contract))
-            # we need to take some action here... try again
-            # it should only get here if it tried to prove before it was
-            # updated which shouldnt happen...  but in case it does,
-            # the contract should still be valid, just put it back
-            # in the proof queue
-            # after 3 seconds
-            time.sleep(3)
-            self._prove_async(contract)
+            # we need to take some action here... this happens if the server
+            # sends back the same challenge as last time.  should be checked
+            # on the update side and if the contract is not updated
+            # it should be added back in the update queue.  otherwise,
+            # this should just remove the contract since its errant
+            self._remove_contract(contract)
 
-        self.heartbeat_thread.wake()
 
     def _submit_async(self, contracts):
         self.worker_pool.put_work(self._submit, (contracts, ), priority=10)
@@ -420,6 +421,9 @@ class DownstreamClient(object):
     def _submit(self, contracts):
         """Submits the specified contracts
         """
+        submitted = set()
+        retry = set()
+
         try:
             with self.submitting_counter(len(contracts)):
                 start = time.clock()
@@ -461,8 +465,6 @@ class DownstreamClient(object):
                                                              list)):
                     raise DownstreamError('Malformed response from server.')
 
-                submitted = set()
-
                 for contract_report in r_json['report']:
                     if ('file_hash' not in contract_report
                             or contract_report['file_hash']
@@ -498,47 +500,44 @@ class DownstreamClient(object):
                             self.contract_thread.wake()
 
                 stop = time.clock()
+                self.logger.info('Submitted {0} proofs successfully in {1} '
+                                 'seconds'
+                                 .format(len(submitted),
+                                         round(stop - start, 3)))
         except:
             self.logger.error('Submission error: {0}'
                               .format(sys.exc_info()[1]))
             # we had an issue submitting these contracts
             # we shall retry until they expire... then they'll
             # get dropped
-            resubmission_time = datetime.utcnow() \
-                + timedelta(seconds=self.retry_interval)
-            for c in contracts:
-                if (c.expiration > resubmission_time):
-                    self.submission_queue.put(c, resubmission_time)
-                else:
-                    # contract expired, drop
-                    self.logger.error('Contract {0} expired, dropping'
-                                      .format(c))
-                    self._remove_contract(c)
-        else:
-            # no issues submitting bulk of the contracts
-            # place submitted proofs in update queue
-            earliest = None
-            for c in contracts:
-                if (c not in submitted):
-                    self.logger.error('Contract {0} not successfully '
-                                      'submitted, dropping'.format(c))
-                    self._remove_contract(c)
-                else:
-                    # print('Putting {0} into update queue.'.format(c))
-                    ready_time = c.expiration
-                    update_time = (c.expiration
-                                   + timedelta(seconds=self.update_margin))
-                    self.update_queue.put(c, update_time, ready_time)
-                    if (earliest is None or c.expiration < earliest):
-                        earliest = c.expiration
+            retry = set(contracts)
 
-            self.logger.info('Submitted {0} proofs successfully in {1} seconds'
-                             .format(len(submitted), round(stop - start, 3)))
-            if (earliest is not None):
-                self.logger.debug('Earliest submitted contract ready in '
-                                  '{0} seconds'
-                                  .format((earliest - datetime.utcnow())
-                                          .total_seconds()))
+        # place submitted proofs in update queue
+        earliest = None
+        resubmission_time = datetime.utcnow() \
+            + timedelta(seconds=self.retry_interval)
+        for c in contracts:
+            if (c in retry and c.expiration > resubmission_time):
+                self.submission_queue.put(c, resubmission_time)
+                continue
+            if (c in submitted):
+                ready_time = c.expiration
+                update_time = (c.expiration
+                               + timedelta(seconds=self.update_margin))
+                self.update_queue.put(c, update_time, ready_time)
+                if (earliest is None or c.expiration < earliest):
+                    earliest = c.expiration
+                continue
+            # otherwise, remove
+            self.logger.error('Contract {0} not successfully '
+                              'submitted, dropping'.format(c))
+            self._remove_contract(c)
+
+        if (earliest is not None):
+            self.logger.debug('Earliest submitted contract ready in '
+                              '{0} seconds'
+                              .format((earliest - datetime.utcnow())
+                                      .total_seconds()))
 
         # and wake heartbeat manager again
         self.heartbeat_thread.wake()
@@ -547,6 +546,9 @@ class DownstreamClient(object):
         self.worker_pool.put_work(self._update, (contracts, ), priority=20)
 
     def _update(self, contracts):
+        updated = set()
+        retry = set()
+
         try:
             with self.updating_counter(len(contracts)):
                 start = time.clock()
@@ -580,7 +582,6 @@ class DownstreamClient(object):
 
                 # challenges is in r_json
                 challenges = r_json['challenges']
-                updated = set()
 
                 for challenge in challenges:
                     if ('file_hash' not in challenge):
@@ -609,6 +610,13 @@ class DownstreamClient(object):
                                 .format(contract))
                             continue
 
+                    if (challenge['answered']):
+                        # contract didn't get updated
+                        # we must have tried too early
+                        # put it in the retry set
+                        retry.add(contract)
+                        continue
+
                     contract.challenge = self.heartbeat.challenge_type().\
                         fromdict(challenge['challenge'])
                     contract.expiration = datetime.utcnow()\
@@ -621,46 +629,43 @@ class DownstreamClient(object):
                     self._prove_async(contract)
 
                 stop = time.clock()
+
+                self.logger.info('Updated {0} contracts in {1} seconds'
+                                 .format(len(updated), round(stop - start, 3)))
         except:
             # some issue updating... retry
             self.logger.error('Update error: {0}'.format(sys.exc_info()[1]))
             # we had an issue updating these contracts
             # we shall retry until they expire... then they'll
             # get dropped
-            reupdate_time = datetime.utcnow() \
-                + timedelta(seconds=self.retry_interval)
-            ready_time = datetime.utcnow()
-            for c in contracts:
-                if (c.expiration + c.estimated_interval > reupdate_time):
-                    self.update_queue.put(c, reupdate_time, ready_time)
-                else:
-                    # this contract is expired, drop it
-                    self.logger.error('Contract {0} expired, dropping'
-                                      .format(c))
-                    self._remove_contract(c)
+            retry = set(contracts) - updated
+
+        earliest = None
+        reupdate_time = datetime.utcnow() \
+            + timedelta(seconds=self.retry_interval)
+        ready_time = datetime.utcnow()
+        for c in contracts:
+            if (c in retry and
+                    c.expiration + c.estimated_interval > reupdate_time):
+                self.update_queue.put(c, reupdate_time, ready_time)
+                continue
+            if (c in updated):
+                if (earliest is None or c.expiration < earliest):
+                    earliest = c.expiration
+                continue
+            # otherwise, remove the contract
+            self.logger.error('Contract {0} not updated, dropping'
+                              .format(c))
+            self._remove_contract(c)
+
+        if (earliest is not None):
+            self.logger.debug('Earliest updated contract due in {0} '
+                              'seconds'
+                              .format((earliest - datetime.utcnow())
+                                      .total_seconds()))
+
+        if (len(retry) > 0):
             self.heartbeat_thread.wake()
-        else:
-            earliest = None
-            for c in contracts:
-                if (c not in updated):
-                    self.logger.error('Contract {0} not updated, dropping'
-                                      .format(c))
-                    self._remove_contract(c)
-                else:
-                    if (earliest is None or c.expiration < earliest):
-                        earliest = c.expiration
-                    # prove should already have begun
-
-            self.logger.info('Updated {0} contracts in {1} seconds'
-                             .format(len(updated), round(stop - start, 3)))
-            if (earliest is not None):
-                self.logger.debug('Earliest updated contract due in {0} '
-                                  'seconds'
-                                  .format((earliest - datetime.utcnow())
-                                          .total_seconds()))
-
-        # dont need to wake heartbeat manager because we didn't put anything
-        # into a queue
 
     def _run_heartbeat_manager(self):
         while self.thread_manager.running:
@@ -708,10 +713,10 @@ class DownstreamClient(object):
             if (len(next) > 0):
                 seconds_to_sleep = (
                     min(next) - datetime.utcnow()).total_seconds()
-                self.logger.debug('Heartbeat manager sleeping {0} seconds'
-                                  .format(seconds_to_sleep))
+                # self.logger.debug('Heartbeat manager sleeping {0} seconds'
+                #                   .format(seconds_to_sleep))
             else:
-                self.logger.debug('Heartbeat manager sleeping indefinitely.')
+                # self.logger.debug('Heartbeat manager sleeping indefinitely.')
                 seconds_to_sleep = None
 
             self.thread_manager.sleep(seconds_to_sleep)
@@ -737,6 +742,12 @@ class DownstreamClient(object):
             name='HeartbeatThread',
             target=self._run_heartbeat_manager)
 
+        # tweak burst queues to wake heartbeat_thread when full
+        self.submission_queue.set_full_callback(200,
+                                                self.heartbeat_thread.wake)
+        self.update_queue.set_full_callback(500,
+                                            self.heartbeat_thread.wake)
+            
         # create the thread pool for challenges
         self.worker_pool = ThreadPool(self.thread_manager, 1)
 

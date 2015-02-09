@@ -19,7 +19,8 @@ class DownstreamContract(object):
                  expiration,
                  tag,
                  manager,
-                 chunk_dir):
+                 chunk_dir,
+                 spoof=False):
         self.hash = hash
         self.seed = seed
         self.size = size
@@ -35,13 +36,15 @@ class DownstreamContract(object):
         self.chunk_generation_rate = 0
         self.proof_data = None
         self.file_lock = threading.Lock()
+        self.spoof = spoof
 
     def __repr__(self):
         return self.hash[:8]
 
     def generate_data(self):
         start = time.clock()
-        RandomIO(self.seed).genfile(self.size, self.path)
+        if (not self.spoof):
+            RandomIO(self.seed).genfile(self.size, self.path)
         stop = time.clock()
         if (stop - start > 0):
             self.chunk_generation_rate = float(self.size) / float(stop - start)
@@ -49,7 +52,7 @@ class DownstreamContract(object):
 
     def cleanup_data(self):
         with self.file_lock:
-            if (os.path.isfile(self.path)):
+            if (os.path.isfile(self.path) and not self.spoof):
                 os.remove(self.path)
             self.data_initialized = False
 
@@ -79,9 +82,19 @@ class DownstreamContract(object):
 
         # ok now we will read from file
         try:
-            with self.file_lock, open(self.path, 'rb') as f:
+            if (self.spoof):
                 proof = self.client.heartbeat.prove(
-                    f, self.challenge, self.tag)
+                    RandomIO(self.seed, self.size),
+                    self.challenge,
+                    self.tag,
+                    filesz=self.size)
+            else:
+                with self.file_lock, open(self.path, 'rb') as f:
+                    proof = self.client.heartbeat.prove(
+                        f,
+                        self.challenge,
+                        self.tag,
+                        filesz=self.size)
         except IOError:
             raise DownstreamError('Unable to open chunk file.')
 
