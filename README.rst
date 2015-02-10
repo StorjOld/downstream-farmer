@@ -75,8 +75,9 @@ The usage of the program is:
 ::
 
 	usage: downstream [-h] [-V] [-n NUMBER] [-p HISTORY] [-s SIZE] [-a ADDRESS]
-					  [-t TOKEN] [-f] [-i IDENTITY] [-d DATA_DIRECTORY] [-k]
-					  [--ssl-no-verify]
+					  [-t TOKEN] [-f] [-i IDENTITY] [-d DATA_DIRECTORY]
+					  [--ssl-no-verify] [--log-path LOG_PATH] [--quiet]
+					  [--print-log]
 					  [node_url]
 
 	positional arguments:
@@ -94,7 +95,7 @@ The usage of the program is:
 							your farming tokens for each node you connect to. The
 							default path is data\history.json.
 	  -s SIZE, --size SIZE  Total size of contracts to obtain in bytes. Default is
-							32768 bytes
+							33554432 bytes
 	  -a ADDRESS, --address ADDRESS
 							SJCX address for farming. You can specify this if you
 							have multiple identities and would like to farm under
@@ -119,16 +120,18 @@ The usage of the program is:
 							   "your sjcx address": {
 								  "message": "your message here",
 								  "signature": "base64 signature from bitcoin\
-												wallet or counterwallet",
+												 wallet or counterwallet",
 							   }
 							}
 							If an identity is specified in this file, it will be
 							used for connecting to any new nodes.
 	  -d DATA_DIRECTORY, --data-directory DATA_DIRECTORY
-							Data directory to place file chunks. By
-							default data\chunks
-	  -k, --keepalive       Will attempt to reconnect upon failure.
+							Data directory to place file chunks. By default
+							data\chunks
 	  --ssl-no-verify       Do not verify ssl certificates.
+	  --log-path LOG_PATH   Path to the log file. Default is: farmer.log
+	  --quiet               Do not show the status console.
+	  --print-log           Print log to screen instead of status console.
 
 This prototype performs three simple functions. It connects to the
 specified node, it requests a chunk (which also gives it the first chunk
