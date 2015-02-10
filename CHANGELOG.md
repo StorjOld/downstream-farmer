@@ -1,6 +1,9 @@
 # downstream-farmer Changelog
 
-### Master
+### v0.1.7
+
+* [BUGFIX] Fixed a few bugs where contract would not be removed if it was not proved in time
+* [ENHANCEMENT] Added some optimizations, and now using heartbeat v0.1.9.
 
 ### v0.1.6
 
