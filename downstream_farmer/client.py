@@ -9,6 +9,7 @@ import json
 import threading
 import time
 import logging
+import traceback
 
 import requests
 import heartbeat
@@ -184,10 +185,15 @@ class DownstreamClient(object):
             url += '/{0}'.format(size)
 
         try:
+            resp = None
+            
             resp = self.session.get(url, verify=self.requests_verify_arg)
 
             r_json = handle_json_response(resp)
         except:
+            self.logger.debug(traceback.format_exc())
+            if (resp is not None):
+                self.logger.debug('Received message: {0}'.format(resp.text))
             raise DownstreamError('Unable to get contracts: {0}'.
                                   format(str(sys.exc_info()[1])))
 
