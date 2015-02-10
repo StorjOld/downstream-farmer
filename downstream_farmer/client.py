@@ -186,7 +186,7 @@ class DownstreamClient(object):
 
         try:
             resp = None
-            
+
             resp = self.session.get(url, verify=self.requests_verify_arg)
 
             r_json = handle_json_response(resp)
