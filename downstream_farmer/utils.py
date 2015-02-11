@@ -340,7 +340,7 @@ class ThreadPool(object):
                 self.logger.debug(
                     '{0} : removing worker'.format(threading.current_thread()))
                 # make sure to retain one worker
-                thread = self.workers.popleft()
+                thread = self.workers.pop()
                 thread.stop()
 
     def calculate_loading(self):
