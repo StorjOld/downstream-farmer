@@ -17,7 +17,7 @@ install:
   - "pip install coverage coveralls"
   - "python setup.py install"
   - "git clone https://github.com/storj/downstream-node.git node"
-  - "cd node ; pip install -r requirements.txt ."
+  - "cd node ; python setup.py install"
   - "mkdir data && cd data"
   - "curl -o GeoLite2-City.mmdb.gz http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz"
   - "gunzip GeoLite2-City.mmdb.gz"
