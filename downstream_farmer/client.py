@@ -367,12 +367,14 @@ class DownstreamClient(object):
                 if (elapsed > 0):
                     self.estimated_onboard_speed = obtained_size / elapsed
                 size_to_fill = self._size_to_fill()
+                if (size_to_fill > 0):
+                    seld.thread_manager.sleep(3)
 
             if (not self.thread_manager.running):
                 # we already exited.  contract_manager needs to return now
                 break
-
-            self.contract_thread.wait(30)
+            # wait a while to check our contract status
+            self.thread_manager.sleep(30)
 
             if (self.desired_heartbeats is not None
                     and self.heartbeat_count >= self.desired_heartbeats):

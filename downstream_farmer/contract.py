@@ -31,7 +31,7 @@ class DownstreamContract(object):
         self.client = client
         self.answered = False
         self.thread_manager = manager
-        self.path = os.path.join(chunk_dir, self.hash)
+        self.path = os.path.join(chunk_dir, str(self.hash))
         self.data_initialized = False
         self.chunk_generation_rate = 0
         self.proof_data = None
@@ -39,7 +39,7 @@ class DownstreamContract(object):
         self.spoof = spoof
 
     def __repr__(self):
-        return self.hash[:8]
+        return str(self.hash)
 
     def generate_data(self):
         start = time.clock()

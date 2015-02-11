@@ -929,7 +929,7 @@ class TestClient(unittest.TestCase):
     def test_run_contract_manager(self):
         self.setup_run_mocks()
 
-        self.client.contract_thread.wait.side_effect = \
+        self.client.thread_manager.sleep.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
         self.client._add_contract.side_effect = AddContractMock(self.client)
@@ -963,7 +963,7 @@ class TestClient(unittest.TestCase):
 
         self.client._add_contract.side_effect = AddContractMock(self.client)
 
-        self.client.contract_thread.wait.side_effect = \
+        self.client.thread_manager.sleep.side_effect = \
             MockContractShutdown(self.client.thread_manager)
 
         self.client._run_contract_manager(True)
