@@ -368,7 +368,7 @@ class DownstreamClient(object):
                     self.estimated_onboard_speed = obtained_size / elapsed
                 size_to_fill = self._size_to_fill()
                 if (size_to_fill > 0):
-                    seld.thread_manager.sleep(3)
+                    self.thread_manager.sleep(3)
 
             if (not self.thread_manager.running):
                 # we already exited.  contract_manager needs to return now
