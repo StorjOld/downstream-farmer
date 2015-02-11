@@ -13,7 +13,7 @@ with open('downstream_farmer/version.py', 'r') as f:
 install_requirements = [
     'six',
     'requests',
-    'RandomIO>=0.2.0',
+    'RandomIO>=0.2.1',
     'storj-heartbeat>=0.1.9',
     'siggy>=0.1.0',
     'colorama'
