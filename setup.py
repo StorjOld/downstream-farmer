@@ -13,7 +13,7 @@ with open('downstream_farmer/version.py', 'r') as f:
 install_requirements = [
     'six',
     'requests',
-    'RandomIO>=0.2.0',
+    'RandomIO>=0.2.1',
     'storj-heartbeat>=0.1.9',
     'siggy>=0.1.0',
     'colorama'
@@ -48,12 +48,6 @@ class PyTest(TestCommand):
         errno = pytest.main(self.pytest_args)
         sys.exit(errno)
 
-dependencies = [
-    'https://github.com/Storj/heartbeat/tarball/master#egg=storj-heartbeat-0.1.9',
-    'https://github.com/Storj/RandomIO/tarball/master#egg=RandomIO-0.2.0',
-    'https://github.com/Storj/siggy/tarball/master#egg=siggy-0.1.0'
-]
-
 setup(
     name='downstream-farmer',
     version=__version__,
@@ -69,7 +63,6 @@ setup(
     cmdclass={'test': PyTest},
     install_requires=install_requirements,
     tests_require=test_requirements,
-    dependency_links=dependencies,
     include_package_data=True,
     entry_points={
         'console_scripts': [
