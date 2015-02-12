@@ -218,7 +218,8 @@ class DownstreamClient(object):
                 datetime.utcnow() + timedelta(seconds=int(chunk['due'])),
                 self.heartbeat.tag_type().fromdict(chunk['tag']),
                 self.thread_manager,
-                self.chunk_dir)
+                self.chunk_dir,
+                spoof=False)
 
             contracts.append(contract)
 

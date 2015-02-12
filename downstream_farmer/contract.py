@@ -86,15 +86,13 @@ class DownstreamContract(object):
                 proof = self.client.heartbeat.prove(
                     RandomIO(self.seed, self.size),
                     self.challenge,
-                    self.tag,
-                    filesz=self.size)
+                    self.tag)
             else:
                 with self.file_lock, open(self.path, 'rb') as f:
                     proof = self.client.heartbeat.prove(
                         f,
                         self.challenge,
-                        self.tag,
-                        filesz=self.size)
+                        self.tag)
         except IOError:
             raise DownstreamError('Unable to open chunk file.')
 

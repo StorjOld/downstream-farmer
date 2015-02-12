@@ -673,33 +673,3 @@ class BurstQueue(object):
                 if (queue_item.is_due()):
                     return True
         return False
-
-
-class SimpleIterableJsonEncoder(json.JSONEncoder):
-
-    def iterencode(self, o, _one_shot=False):
-        try:
-            # try base class method
-            chunks = json.JSONEncoder.iterencode(self, o, _one_shot)
-            for chunk in chunks:
-                yield chunk
-        except TypeError as ex:
-            # type error... see if the item is iterable
-            try:
-                iterable = iter(o)
-            except:
-                raise ex
-            else:
-                # item is iterable
-                yield '['
-                buf = ''
-                first = True
-                for item in iterable:
-                    if (first):
-                        first = False
-                    else:
-                        buf = self.item_separator
-                    chunks = self.iterencode(item)
-                    for chunk in chunks:
-                        yield buf + chunk
-                yield ']'
