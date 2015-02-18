@@ -26,7 +26,7 @@ install:
 before_script:
   - 'mysql -e "create database if not exists downstream;" -u root'
   - "cd node"
-  - "cp downstream_node/config.template.py downstream_node/config.py"
+  - "cp downstream_node/config_template.py downstream_node/config.py"
   - "python runapp.py --initdb"
   - "python runapp.py --generate-chunk 32768"
   - 'mysql downstream -e "insert into addresses (address, crowdsale_balance) values (''19qVgG8C6eXwKMMyvVegsi3xCsKyk3Z3jV'',10000);" -u root'
