@@ -377,8 +377,8 @@ class DownstreamClient(object):
             # wait a while to check our contract status
             self.thread_manager.sleep(30)
 
-            if (self.desired_heartbeats is not None
-                    and self.heartbeat_count >= self.desired_heartbeats):
+            if (self.desired_heartbeats is not None and
+                    self.heartbeat_count >= self.desired_heartbeats):
                 # signal a shutdown, and return
                 self.logger.info('Heartbeat number requirement met.')
                 self.thread_manager.signal_shutdown()
@@ -476,8 +476,8 @@ class DownstreamClient(object):
                     raise DownstreamError('Malformed response from server.')
 
                 for contract_report in r_json['report']:
-                    if ('file_hash' not in contract_report
-                            or contract_report['file_hash']
+                    if ('file_hash' not in contract_report or
+                            contract_report['file_hash']
                             not in contract_dict):
                         # fail nicely with a malformed contract report
                         self.logger.warn('Unexpected contract report.')
@@ -491,8 +491,8 @@ class DownstreamClient(object):
                                           .format(contract,
                                                   contract_report['error']))
                         continue
-                    if ('status' not in contract_report
-                            or contract_report['status'] != 'ok'):
+                    if ('status' not in contract_report or
+                            contract_report['status'] != 'ok'):
                         self.logger.error('No status for contract {0}'
                                           .format(contract))
                         continue
@@ -532,8 +532,8 @@ class DownstreamClient(object):
                 continue
             if (c in submitted):
                 ready_time = c.expiration
-                update_time = (c.expiration
-                               + timedelta(seconds=self.update_margin))
+                update_time = (c.expiration +
+                               timedelta(seconds=self.update_margin))
                 self.update_queue.put(c, update_time, ready_time)
                 if (earliest is None or c.expiration < earliest):
                     earliest = c.expiration

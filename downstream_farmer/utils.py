@@ -624,8 +624,7 @@ class BurstQueue(object):
     def set_full_callback(self, full_size, full_callback):
         self.full_size = full_size
         self.full_callback = full_callback
-        self.callback = (full_size is not None
-                         and full_callback is not None)
+        self.callback = (full_size is not None and full_callback is not None)
 
     def put(self, item, due, earliest=None):
         with self.queue_lock:
